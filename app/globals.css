@@ -1,0 +1,171 @@
+@import "tailwindcss";
+
+/*
+  HL Studio design tokens. Source of truth: BRIEF.md section 3.
+
+  Layering across the page (z-index):
+    0   backgrounds, hero image
+    10  the line overlay (phase 3: one fixed SVG, pointer-events none)
+    20  all text and content (see <Container>)
+    30  nav
+*/
+
+:root {
+  --ivory: #f7f5ef;
+  --charcoal: #1a1a1a;
+  --fog: #d6d6d1;
+  --forest: #2e4b3f;
+  /* charcoal with a slight forest tint, used for the dark closing section */
+  --night: #1b201d;
+  --nav-height: 80px;
+}
+
+@theme inline {
+  --color-ivory: var(--ivory);
+  --color-charcoal: var(--charcoal);
+  --color-fog: var(--fog);
+  --color-forest: var(--forest);
+  --color-night: var(--night);
+
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-serif: var(--font-playfair), Georgia, serif;
+
+  /* vertical rhythm: 160px / 208px section padding */
+  --spacing-section: 10rem;
+  --spacing-section-lg: 13rem;
+  --spacing-nav: var(--nav-height);
+
+  /* 1280px content width inside a 1440 design width */
+  --container-content: 80rem;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
+  body {
+    background-color: var(--ivory);
+    color: var(--charcoal);
+    font-family: var(--font-sans);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background-color: var(--forest);
+    color: var(--ivory);
+  }
+
+  /* inline logos: the SVGs use currentColor, height is set by the wrapper */
+  [data-logo] svg {
+    display: block;
+    height: 100%;
+    width: auto;
+  }
+}
+
+/* Inter, uppercase, 11px, 0.14em tracking */
+@utility label {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 1.3;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+@utility label-lg {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.3;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* body copy, max 62 characters per line */
+@utility body-text {
+  font-size: 17px;
+  line-height: 1.6;
+  max-width: 62ch;
+}
+
+@utility body-text-lg {
+  font-size: 18px;
+  line-height: 1.6;
+  max-width: 62ch;
+}
+
+/* Playfair Display display sizes, weight 400, tight tracking */
+@utility display-h1 {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(2.75rem, 5vw, 4.75rem);
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+}
+
+@utility display-h2 {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(2.25rem, 3.4vw, 3.25rem);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+
+@utility display-statement {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(2.75rem, 5.6vw, 5.5rem);
+  line-height: 1.04;
+  letter-spacing: -0.025em;
+}
+
+@utility display-numeral {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(2.75rem, 4.4vw, 4.5rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: lining-nums;
+  white-space: nowrap;
+}
+
+@utility display-name {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(1.75rem, 2.6vw, 2.5rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+@utility display-lead {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(1.5rem, 2vw, 1.75rem);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+@utility display-figure {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(2rem, 2.8vw, 2.75rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: lining-nums;
+}
+
+/* portraits: greyscale, white background disappears on ivory */
+@utility portrait {
+  filter: grayscale(1);
+  mix-blend-mode: multiply;
+}
