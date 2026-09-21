@@ -7,6 +7,8 @@ type Tone = "ivory" | "dark";
 /**
  * Vertical frame for one page section: 160px / 208px padding, surface tone.
  * `className` applies to the <section>, `inner` to the content frame.
+ * `narrow` keeps the content in the left two thirds on desktop: the right
+ * third is the stage where the line sits with its icons.
  */
 export function Section({
   id,
@@ -14,12 +16,14 @@ export function Section({
   children,
   className,
   inner,
+  narrow = false,
 }: {
   id?: string;
   tone?: Tone;
   children: ReactNode;
   className?: string;
   inner?: string;
+  narrow?: boolean;
 }) {
   return (
     <section
@@ -31,7 +35,9 @@ export function Section({
         className,
       )}
     >
-      <Container className={inner}>{children}</Container>
+      <Container className={inner}>
+        {narrow ? <div className="lg:w-[calc(66.666%-1.5rem)]">{children}</div> : children}
+      </Container>
     </section>
   );
 }

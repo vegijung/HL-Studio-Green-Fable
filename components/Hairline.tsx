@@ -4,7 +4,7 @@ import { cx } from "@/lib/cx";
  * A static 1px rule where the line runs. Two jobs:
  *   - below 1024px and under reduced motion it is the visible line
  *   - on desktop the engine hides it and, if `anchor` is set, uses its position
- *     as the anchor the line rides through this section
+ *     as an anchor the line rides through this section (facts, contact)
  */
 export function Hairline({
   tone = "fog",
@@ -16,6 +16,8 @@ export function Hairline({
   pin,
   pinTarget,
   pinAt,
+  pinShape,
+  release,
   rideTop,
 }: {
   tone?: "fog" | "ivory" | "forest";
@@ -33,6 +35,10 @@ export function Hairline({
   pinTarget?: string;
   /** viewport height fraction at which the anchor sits when the pin starts (default: the ride top) */
   pinAt?: number;
+  /** shape the line morphs into during the pin */
+  pinShape?: "ridge" | "ridge-facts" | "straight";
+  /** after the pin the line keeps riding with the anchor until it reaches this viewport height fraction (default: pinAt) */
+  release?: number;
   /** viewport height fraction where the line stops riding this anchor (default 0.22) */
   rideTop?: number;
 }) {
@@ -47,6 +53,8 @@ export function Hairline({
       data-line-pin={anchor ? pin : undefined}
       data-line-pin-target={anchor ? pinTarget : undefined}
       data-line-pin-at={anchor && pinAt !== undefined ? pinAt : undefined}
+      data-line-pin-shape={anchor ? pinShape : undefined}
+      data-line-release={anchor && release !== undefined ? release : undefined}
       data-line-ride-top={anchor && rideTop !== undefined ? rideTop : undefined}
       className={cx(
         "h-px w-full",

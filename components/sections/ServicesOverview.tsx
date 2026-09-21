@@ -3,14 +3,17 @@ import { Hairline } from "@/components/Hairline";
 import { Section, SectionHead } from "@/components/Section";
 import type { SiteContent } from "@/content/types";
 
-/** Section 5: label, H2, text and the four service names in one row */
+/**
+ * Section 5: label, H2, text and the four service names as large serif words.
+ * Content stays in the left two thirds; the line's stage sits to the right.
+ */
 export function ServicesOverview({ content }: { content: SiteContent["services"] }) {
   return (
-    <Section id="leistungen">
+    <Section id="leistungen" narrow>
       <SectionHead label={content.label} title={content.h2} text={content.text} />
 
-      <nav aria-label="Leistungen" className="mt-28 lg:mt-36">
-        <ul className="flex flex-col gap-y-10 lg:flex-row lg:items-end lg:justify-between lg:gap-x-8">
+      <nav aria-label="Leistungen" className="mt-24 lg:mt-32">
+        <ul className="grid grid-cols-1 gap-x-10 gap-y-10 sm:grid-cols-2">
           {content.items.map((service) => (
             <li key={service.slug}>
               <Link
@@ -25,7 +28,7 @@ export function ServicesOverview({ content }: { content: SiteContent["services"]
             </li>
           ))}
         </ul>
-        <Hairline anchor="services" opacity={0.6} className="mt-10 opacity-60" />
+        <Hairline className="mt-12 opacity-60" />
       </nav>
     </Section>
   );

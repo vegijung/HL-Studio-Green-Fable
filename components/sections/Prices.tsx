@@ -7,10 +7,10 @@ import type { SiteContent } from "@/content/types";
 /** Section 11: three columns separated by fog hairlines, no boxes, no badge */
 export function Prices({ content }: { content: SiteContent["prices"] }) {
   return (
-    <Section id="preise">
+    <Section id="preise" narrow>
       <SectionHead label={content.label} title={content.h2} text={content.text} />
 
-      <Hairline anchor="prices" opacity={0.4} className="mt-24 lg:mt-32" />
+      <Hairline className="mt-24 lg:mt-32" />
 
       <div className="grid gap-y-16 lg:grid-cols-3 lg:gap-y-0">
         {content.columns.map((column, i) => (
@@ -18,8 +18,8 @@ export function Prices({ content }: { content: SiteContent["prices"] }) {
             key={column.name}
             className={cx(
               "flex flex-col pt-12 lg:pb-4",
-              i > 0 && "lg:border-l lg:border-fog lg:pl-10",
-              i < content.columns.length - 1 && "lg:pr-10",
+              i > 0 && "lg:border-l lg:border-fog lg:pl-8",
+              i < content.columns.length - 1 && "lg:pr-8",
             )}
           >
             <p className="label">{column.name}</p>

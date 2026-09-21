@@ -69,7 +69,7 @@ const f1 = (v: number) => (Math.round(v * 10) / 10).toString();
  * length. `tension` pulls the control points toward the vertices (0 = classic
  * Catmull-Rom, 1 = straight segments); a little keeps sharp peaks sharp.
  */
-export function catmullRomPath(xs: ArrayLike<number>, ys: ArrayLike<number>, tension = 0.4): string {
+export function catmullRomPath(xs: ArrayLike<number>, ys: ArrayLike<number>, tension = 0.6): string {
   const n = xs.length;
   if (n < 2) return "";
   const k = (1 - tension) / 6;

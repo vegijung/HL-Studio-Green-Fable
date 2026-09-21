@@ -31,19 +31,19 @@ function Portrait({ member, sizes, priority = false }: { member: Member; sizes: 
 export function Team({ content }: { content: SiteContent["team"] }) {
   const [first, second] = content.members;
   return (
-    <Section id="team">
+    <Section id="team" narrow>
       <SectionHead label={content.label} title={content.h2} text={content.text} />
 
       <Grid className="mt-24 items-start lg:mt-32">
-        <div className="col-span-8 lg:col-span-5">
-          <Portrait member={first} sizes="(min-width: 1024px) 40vw, 66vw" />
+        <div className="col-span-8 lg:col-span-6">
+          <Portrait member={first} sizes="(min-width: 1024px) 30vw, 66vw" />
         </div>
-        <div className="col-span-7 col-start-5 mt-16 lg:col-span-4 lg:col-start-8 lg:mt-40">
-          <Portrait member={second} sizes="(min-width: 1024px) 32vw, 58vw" />
+        <div className="col-span-7 col-start-5 mt-16 lg:col-span-5 lg:col-start-8 lg:mt-40">
+          <Portrait member={second} sizes="(min-width: 1024px) 24vw, 58vw" />
         </div>
       </Grid>
 
-      <Hairline anchor="team" className="mt-20 lg:mt-28" />
+      <Hairline className="mt-20 lg:mt-28" />
     </Section>
   );
 }

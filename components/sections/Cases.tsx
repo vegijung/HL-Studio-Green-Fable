@@ -15,13 +15,13 @@ function Figure({ metric, align }: { metric: Metric; align: "left" | "right" }) 
   );
 }
 
-/** before → after, set on a hairline that acts as the axis (the line, in phase 3) */
-function BeforeAfter({ item, index }: { item: Case; index: number }) {
+/** before → after, set on a hairline that acts as the axis */
+function BeforeAfter({ item }: { item: Case }) {
   return (
     <div className="flex items-start gap-6">
       <Figure metric={item.before} align="left" />
       <div aria-hidden className="relative mt-4 flex flex-1 items-center">
-        <Hairline anchor={`case-${index + 1}`} opacity={0.4} />
+        <Hairline />
         <svg
           viewBox="0 0 8 12"
           width="8"
@@ -42,7 +42,7 @@ function BeforeAfter({ item, index }: { item: Case; index: number }) {
 /** Section 10: three rows, not cards. Built so a logo can replace the sector label later. */
 export function Cases({ content }: { content: SiteContent["cases"] }) {
   return (
-    <Section id="cases">
+    <Section id="cases" narrow>
       <SectionHead label={content.label} title={content.h2} text={content.text} />
 
       <ol className="mt-24 lg:mt-32">
@@ -58,16 +58,16 @@ export function Cases({ content }: { content: SiteContent["cases"] }) {
                   </p>
                 )}
               </div>
-              <div className="col-span-12 lg:col-span-4">
+              <div className="col-span-12 lg:col-span-9">
                 <h3 className="display-lead" data-line-gap>
                   {item.title}
                 </h3>
                 <p className="body-text mt-6 text-[16px] text-charcoal/80" data-line-gap>
                   {item.text}
                 </p>
-              </div>
-              <div className="col-span-12 lg:col-span-4 lg:col-start-9">
-                <BeforeAfter item={item} index={content.items.indexOf(item)} />
+                <div className="mt-10 max-w-[30rem]">
+                  <BeforeAfter item={item} />
+                </div>
               </div>
             </Grid>
           </li>

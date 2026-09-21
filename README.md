@@ -38,10 +38,15 @@ The extraction writes `content/ridge.json` and a debug overlay to `assets/refere
 
 ## The line
 
-`lib/line/` is the engine from BRIEF.md section 5: `geometry.ts` (resampling, Catmull-Rom, easing), `states.ts` (the 240-point shapes and the thread morph), `engine.ts` (timeline, inertia, colour, text-gap mask), `hero.ts` (opening and lift-off), `facts.ts` (annotation spots). `components/line/LineOverlay.tsx` mounts it on the home page together with Lenis; below 1024px and under reduced motion it stays off and the static hairlines remain.
+`lib/line/` is the engine from BRIEF.md section 5: `geometry.ts` (resampling, Catmull-Rom, easing), `states.ts` (the 240-point shapes and the thread morph), `icons.ts` (the four one-stroke icons and the stage partition), `engine.ts` (timeline, inertia, colour, text-gap mask), `hero.ts` (opening and lift-off), `facts.ts` (annotation spots). `components/line/LineOverlay.tsx` mounts it on the home page together with Lenis; below 1024px and under reduced motion it stays off and the static hairlines remain.
 
-Every `<Hairline anchor="…">` in a section is a point the line rides through. The line follows an anchor with the content while it crosses the middle band of the viewport and blends to the next one in between; `shape`, `opacity`, `transition` and `pin` on the anchor set what it does there. Text that the line must not cross carries `data-line-gap`.
+The page has three kinds of nodes for the line:
 
+- **hero**: the ridge, registered on the photo at scroll 0.
+- **anchor**: a `<Hairline anchor="...">` the line rides through with the content while it crosses the middle band of the viewport (facts, contact). `shape`, `opacity`, `transition`, `pin`, `pinShape` and `release` on the anchor set what it does there; after a pin the flat line keeps riding with the content until the anchor reaches `release`.
+- **stage**: the fixed box on the right third of the viewport (`[data-line-stage]` in `app/page.tsx`). From the services section on, the thread contracts into a short segment there and is pulled into one icon after another as the chapters pass (the programme in `engine.ts`), then stays quiet through cases, prices and team and expands into the closing ridge. The content of those sections stays in the left two thirds (`<Section narrow>`), so the line never crosses text. Every stage shape uses the same point partition, so an icon change is a true morph: the thread settles into the segment and rises into the next icon, the change travelling along the stroke.
+
+Text that the line must not cross elsewhere carries `data-line-gap`.
 ## Phases
 
-See BRIEF.md section 9. Phases 1 (scaffold and static page), 2 (mountain and ridge) and 3 (line engine) are done; the icons and the polish follow.
+See BRIEF.md section 9. Phases 1 (scaffold and static page), 2 (mountain and ridge), 3 (line engine) and 4 (icons on the stage) are done; the polish follows.

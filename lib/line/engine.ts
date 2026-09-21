@@ -1,16 +1,19 @@
 /**
  * The line engine (BRIEF.md section 5).
  *
- * One fixed SVG, one path of N points. Every place where the line should run
- * is an anchor element (`data-line-anchor`). The line rides an anchor with the
- * content while the anchor crosses the middle band of the viewport
- * (RIDE_BOTTOM -> RIDE_TOP) and blends to the next anchor in between. Shapes
- * morph with a per-point delay (thread feel), the rendered scroll position
- * lerps toward the real one (inertia), and text with `data-line-gap` is cut
- * out of the line through an SVG mask.
+ * One fixed SVG, one path of N points. The page has three kinds of nodes:
  *
- * Scroll positions come from ScrollTrigger instances tied to the elements, so
- * pins and resizes are handled by ScrollTrigger's refresh.
+ *   hero     the ridge, registered on the photo at scroll 0
+ *   anchor   an element (`data-line-anchor`) the line rides with the content
+ *            while it crosses the middle band of the viewport (facts, contact)
+ *   stage    a fixed spot on the right of the viewport where the thread sits as
+ *            a short segment and is pulled into one icon after another as the
+ *            chapters pass (the middle of the page)
+ *
+ * Between nodes the shape morphs with a per-point delay (thread feel) and the
+ * baseline blends. The rendered scroll position lerps toward the real one
+ * (inertia), the colour follows the surface under the line, and text with
+ * `data-line-gap` is cut out of the line through an SVG mask.
  */
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -23,12 +26,10 @@ import {
   ridgeState,
   straightState,
   stretchState,
-  X_MAX,
-  X_MIN,
   type LineState,
   type MorphMode,
 } from "./states";
-import { ICONS, iconState, type IconName } from "./icons";
+import { ICONS, iconState, segmentState, type IconName } from "./icons";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -37,45 +38,62 @@ export type ShapeName = "ridge" | "ridge-facts" | "straight";
 /** the band of the viewport in which the line rides with an anchor */
 export const RIDE_BOTTOM = 0.72;
 export const RIDE_TOP = 0.22;
-/** minimum scroll distance (in vh) reserved for the blend between two anchors */
+/** minimum scroll distance (in vh) reserved for the blend between two nodes */
 const GAP_VH = 0.2;
+/** the blend from an anchor onto the stage takes at least this long (in vh): contract, then drop */
+const STAGE_GAP_VH = 0.4;
 /** inertia: fraction of the remaining distance closed per frame */
 const INERTIA = 0.08;
 /** the rendered line never trails the real scroll by more than this (in vh) */
 const MAX_LAG_VH = 0.5;
 /** padding around text gaps in px */
 const GAP_PAD = 14;
+/** stage: a chapter boundary morphs the icon while it passes from this to that viewport fraction */
+const STAGE_MORPH_FROM = 0.82;
+const STAGE_MORPH_TO = 0.34;
+/** the part of an icon-to-icon morph spent settling into the segment before the next icon rises */
+const STAGE_SETTLE = 0.4;
+/** stage icon size in px */
+const ICON_SIZE = 200;
+/** stage opacity before the chapters, during them, and after them */
+const STAGE_OPACITY = [0.6, 1, 0.4];
+/** the stage's icons in chapter order, and the section ids whose top starts the morph into each one */
+const STAGE_PROGRAMME: Array<{ section: string; icon: IconName | null }> = [
+  { section: "websites", icon: "browser" },
+  { section: "automationen", icon: "loops" },
+  { section: "backoffice", icon: "sheet" },
+  { section: "beratung-schulung", icon: "bubble" },
+  { section: "cases", icon: null },
+];
 
 const IVORY = [247, 245, 239];
 const FOREST = [46, 75, 63];
 
-/** an icon that forms on the line while it rides a chapter anchor */
-interface IconSpec {
-  name: IconName;
-  slot: HTMLElement;
-  headline: HTMLElement;
-  /** document y of the headline's top, measured on refresh */
-  headlineDocY: number;
-  state: LineState;
-}
-
 interface Node {
+  kind: "hero" | "anchor" | "stage";
   el: HTMLElement | null;
   shape: ShapeName;
   opacity: number;
   transition: MorphMode;
-  /** viewport fraction where this anchor's ride ends (default RIDE_TOP) */
+  /** viewport fraction where an anchor's ride ends */
   rideTop: number;
-  icon: IconSpec | null;
   ride: ScrollTrigger | null;
   pin: ScrollTrigger | null;
-  /** ride window in scroll px */
+  /** shape the line morphs into during the pin, and how */
+  pinShape: ShapeName;
+  pinTransition: MorphMode;
+  /** viewport fractions: where the anchor sits when the pin starts, and where the line lets go after it */
+  pinAt: number;
+  release: number;
+  /** scroll px at which the line lets go of a pinned anchor (pin end plus the hold) */
+  holdEnd: number;
+  /** window in scroll px during which the line holds this node */
   start: number;
   end: number;
   /** document y of the anchor's centre (anchors) */
   docY: number;
-  /** viewport y at scroll 0 (hero) */
-  heroBaseline: number;
+  /** fixed viewport y (hero at scroll 0, stage) */
+  fixedY: number;
   pinStart: number;
   pinLen: number;
 }
@@ -97,11 +115,15 @@ interface Gap {
 /** an element that keeps its vertical position glued to the line (the facts annotations) */
 interface Follower {
   el: HTMLElement;
-  /** normalised viewport x of the point it marks */
   x: number;
-  /** the point's dy (fraction of vh) in the anchor's own shape */
   dy: number;
   node: Node | null;
+}
+
+interface StageStep {
+  /** document y of the section top that drives this step */
+  docTop: number;
+  shape: LineState;
 }
 
 export class LineEngine {
@@ -132,6 +154,11 @@ export class LineEngine {
   private gaps: Gap[] = [];
   private followers: Follower[] = [];
 
+  /** the stage: its element, the plain segment and the programme of icons */
+  private stageEl: HTMLElement | null = null;
+  private stageSegment = emptyState();
+  private stageSteps: StageStep[] = [];
+
   private vw = 0;
   private vh = 0;
   private rendered = 0;
@@ -143,6 +170,7 @@ export class LineEngine {
   private pathLength = 0;
   private drawing = false;
   private started = false;
+  private heroObserver: ResizeObserver | null = null;
 
   private readonly tick = () => this.frame();
   private readonly onRefresh = () => this.measure();
@@ -179,8 +207,6 @@ export class LineEngine {
     }
   }
 
-  private heroObserver: ResizeObserver | null = null;
-
   destroy() {
     gsap.ticker.remove(this.tick);
     this.heroObserver?.disconnect();
@@ -196,58 +222,70 @@ export class LineEngine {
     this.started = false;
   }
 
+  private newNode(partial: Partial<Node> & Pick<Node, "kind">): Node {
+    return {
+      el: null,
+      shape: "straight",
+      opacity: 1,
+      transition: "ltr",
+      rideTop: RIDE_TOP,
+      ride: null,
+      pin: null,
+      pinShape: "straight",
+      pinTransition: "outside-in",
+      pinAt: RIDE_TOP,
+      release: RIDE_TOP,
+      holdEnd: 0,
+      start: 0,
+      end: 0,
+      docY: 0,
+      fixedY: 0.5,
+      pinStart: 0,
+      pinLen: 0,
+      ...partial,
+    };
+  }
+
   /** viewport y (0..1) of the line's baseline for a node at scroll s */
   private yAt(n: Node, s: number): number {
-    if (!n.el) return n.heroBaseline - s / this.vh;
+    if (n.kind === "hero") return n.fixedY - s / this.vh;
+    if (n.kind === "stage") return n.fixedY;
     const shift = n.pin ? clamp(s - n.pinStart, 0, n.pinLen) : 0;
     return (n.docY - s + shift) / this.vh;
   }
 
   private build() {
     const hero = document.getElementById("hero");
-    this.nodes = [
-      {
-        el: null,
-        shape: "ridge",
-        opacity: 1,
-        transition: "ltr",
-        rideTop: RIDE_TOP,
-        icon: null,
-        ride: null,
-        pin: null,
-        start: 0,
-        end: 0,
-        docY: 0,
-        heroBaseline: 0.3,
-        pinStart: 0,
-        pinLen: 0,
-      },
-    ];
+    this.stageEl = document.querySelector<HTMLElement>("[data-line-stage]");
+    this.nodes = [this.newNode({ kind: "hero", shape: "ridge", fixedY: 0.3 })];
 
     const anchors = Array.from(document.querySelectorAll<HTMLElement>("[data-line-anchor]"));
+    // the stage node goes before the first anchor that follows the section it starts from
+    const stageFrom = this.stageEl ? document.getElementById(this.stageEl.dataset.lineStageFrom || "") : null;
+    let stageInserted = !this.stageEl;
     for (const el of anchors) {
-      const name = el.dataset.lineAnchor!;
+      if (
+        !stageInserted &&
+        this.stageEl &&
+        stageFrom &&
+        stageFrom.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING
+      ) {
+        this.nodes.push(this.newNode({ kind: "stage", el: this.stageEl }));
+        stageInserted = true;
+      }
       const rideTop = el.dataset.lineRideTop ? Number(el.dataset.lineRideTop) : RIDE_TOP;
       const ride = ScrollTrigger.create({
         trigger: el,
         start: `top ${RIDE_BOTTOM * 100}%`,
         end: `top ${rideTop * 100}%`,
       });
-      const slot = document.querySelector<HTMLElement>(`[data-line-icon-slot="${name}"]`);
-      const headline = document.querySelector<HTMLElement>(`[data-line-icon-headline="${name}"]`);
-      const iconName = slot?.dataset.lineIcon as IconName | undefined;
-      const icon: IconSpec | null =
-        slot && headline && iconName && ICONS[iconName]
-          ? { name: iconName, slot, headline, headlineDocY: 0, state: emptyState() }
-          : null;
       let pin: ScrollTrigger | null = null;
       const pinLen = el.dataset.linePin;
+      const pinAt = el.dataset.linePinAt ? Number(el.dataset.linePinAt) : RIDE_TOP;
       if (pinLen) {
         const target = el.dataset.linePinTarget
           ? document.querySelector<HTMLElement>(el.dataset.linePinTarget)
           : el.closest<HTMLElement>("section");
-        // where in the viewport the anchor is when the pin starts (fraction of vh)
-        const pinAt = el.dataset.linePinAt ? Number(el.dataset.linePinAt) : RIDE_TOP;
         if (target) {
           pin = ScrollTrigger.create({
             trigger: el,
@@ -259,23 +297,24 @@ export class LineEngine {
           });
         }
       }
-      this.nodes.push({
-        el,
-        shape: (el.dataset.lineShape as ShapeName) || "straight",
-        opacity: el.dataset.lineOpacity ? Number(el.dataset.lineOpacity) : 1,
-        transition: (el.dataset.lineTransition as MorphMode) || "ltr",
-        rideTop,
-        icon,
-        ride,
-        pin,
-        start: 0,
-        end: 0,
-        docY: 0,
-        heroBaseline: 0,
-        pinStart: 0,
-        pinLen: 0,
-      });
+      this.nodes.push(
+        this.newNode({
+          kind: "anchor",
+          el,
+          shape: (el.dataset.lineShape as ShapeName) || "straight",
+          opacity: el.dataset.lineOpacity ? Number(el.dataset.lineOpacity) : 1,
+          transition: (el.dataset.lineTransition as MorphMode) || "ltr",
+          rideTop,
+          ride,
+          pin,
+          pinShape: (el.dataset.linePinShape as ShapeName) || "straight",
+          pinTransition: (el.dataset.linePinTransition as MorphMode) || "outside-in",
+          pinAt,
+          release: el.dataset.lineRelease ? Number(el.dataset.lineRelease) : pinAt,
+        }),
+      );
     }
+    if (!stageInserted && this.stageEl) this.nodes.push(this.newNode({ kind: "stage", el: this.stageEl }));
 
     this.sections = Array.from(document.querySelectorAll<HTMLElement>("[data-tone]")).map((el) => ({
       el,
@@ -285,13 +324,15 @@ export class LineEngine {
       tone: el.dataset.tone === "dark" ? 0 : 1,
       hero: el === hero,
     }));
-
   }
 
   /** re-measures everything that depends on layout; runs on every ScrollTrigger refresh */
   private measure() {
     this.vw = window.innerWidth;
     this.vh = window.innerHeight;
+    this.svg.setAttribute("viewBox", `0 0 ${this.vw} ${this.vh}`);
+    this.maskBg.setAttribute("width", String(this.vw));
+    this.maskBg.setAttribute("height", String(this.vh));
 
     // gaps and followers are collected here, not in build(), because the facts render after start
     this.gaps = Array.from(document.querySelectorAll<HTMLElement>("[data-line-gap]")).map((el) => ({
@@ -304,9 +345,6 @@ export class LineEngine {
       dy: Number(el.dataset.lineFollowDy),
       node: this.nodes.find((n) => n.el?.dataset.lineAnchor === el.dataset.lineFollow) ?? null,
     }));
-    this.svg.setAttribute("viewBox", `0 0 ${this.vw} ${this.vh}`);
-    this.maskBg.setAttribute("width", String(this.vw));
-    this.maskBg.setAttribute("height", String(this.vh));
 
     const hero = document.getElementById("hero");
     const box = hero ? hero.getBoundingClientRect() : { width: this.vw, height: this.vh };
@@ -325,54 +363,75 @@ export class LineEngine {
       hero.style.setProperty("--ridge-clear", `${Math.round(clear)}px`);
     }
 
-    for (const n of this.nodes) {
-      if (!n.el) {
-        n.heroBaseline = baseline;
-        continue;
-      }
-      const ride = n.ride!;
-      n.start = ride.start;
-      n.end = ride.end;
-      n.docY = ride.start + RIDE_BOTTOM * this.vh + n.el.offsetHeight / 2;
-      if (n.pin) {
-        n.pinStart = n.pin.start;
-        n.pinLen = n.pin.end - n.pin.start;
-        n.end = n.pinStart;
-      }
-      if (n.icon) {
-        // the icon stands on the line inside its slot; the headline drives its amount
-        const anchorRect = n.el.getBoundingClientRect();
-        const slotRect = n.icon.slot.getBoundingClientRect();
-        const headRect = n.icon.headline.getBoundingClientRect();
-        n.icon.headlineDocY = n.docY + (headRect.top - anchorRect.top);
-        n.icon.state = iconState(
-          ICONS[n.icon.name],
-          { x0: slotRect.left / this.vw, w: slotRect.width / this.vw, h: slotRect.height / this.vh },
-          this.vw,
-          this.vh,
-          X_MIN,
-          X_MAX,
-        );
-      }
-    }
-
-    // consecutive ride windows must not overlap; leave room for the blend between them
-    const gap = GAP_VH * this.vh;
-    for (let i = 0; i < this.nodes.length - 1; i++) {
-      const a = this.nodes[i];
-      const b = this.nodes[i + 1];
-      if (a.end > b.start - gap) {
-        const m = (a.end + b.start) / 2;
-        if (!a.pin) a.end = Math.max(a.start, m - gap / 2);
-        b.start = Math.max(a.end + gap, m + gap / 2);
-        if (b.end < b.start) b.end = b.start;
-      }
-    }
-
     for (const s of this.sections) {
       // ScrollTrigger clamps `end` to the maximum scroll, so take the height from the element
       s.top = s.st.start;
       s.bottom = s.st.start + s.el.offsetHeight;
+    }
+    const sectionTop = (id: string) => this.sections.find((s) => s.el.id === id)?.top ?? null;
+
+    for (const n of this.nodes) {
+      if (n.kind === "hero") {
+        n.fixedY = baseline;
+        continue;
+      }
+      if (n.kind === "anchor" && n.el) {
+        const ride = n.ride!;
+        n.start = ride.start;
+        n.end = ride.end;
+        n.docY = ride.start + RIDE_BOTTOM * this.vh + n.el.offsetHeight / 2;
+        if (n.pin) {
+          n.pinStart = n.pin.start;
+          n.pinLen = n.pin.end - n.pin.start;
+          n.end = n.pinStart;
+          // after the pin the flat line rides on with the content until the anchor reaches `release`
+          n.holdEnd = n.pinStart + n.pinLen + Math.max(0, n.pinAt - n.release) * this.vh;
+        }
+      }
+    }
+
+    // the stage: a fixed box on the right; holds from the first stage section to just before the next anchor
+    const stage = this.nodes.find((n) => n.kind === "stage");
+    if (stage && this.stageEl) {
+      const rect = this.stageEl.getBoundingClientRect();
+      const x0 = rect.left / this.vw;
+      const x1 = rect.right / this.vw;
+      stage.fixedY = rect.bottom / this.vh;
+      const iconBox = {
+        x0: (rect.left + rect.width / 2 - ICON_SIZE / 2) / this.vw,
+        w: ICON_SIZE / this.vw,
+        h: ICON_SIZE / this.vh,
+      };
+      this.stageSegment = segmentState(iconBox, this.vw, this.vh, x0, x1);
+      this.stageSteps = STAGE_PROGRAMME.flatMap((step) => {
+        const docTop = sectionTop(step.section);
+        if (docTop === null) return [];
+        const shape = step.icon
+          ? iconState(ICONS[step.icon], iconBox, this.vw, this.vh, x0, x1)
+          : copyState(this.stageSegment);
+        return [{ docTop, shape }];
+      });
+      const stageIndex = this.nodes.indexOf(stage);
+      const first = this.stageSteps[0];
+      const firstSection = sectionTop(this.stageEl.dataset.lineStageFrom || "leistungen");
+      stage.start = (firstSection ?? first?.docTop ?? 0) - 0.55 * this.vh;
+      const after = this.nodes[stageIndex + 1];
+      stage.end = after ? after.start - 0.6 * this.vh : Number.MAX_SAFE_INTEGER;
+      if (stage.end < stage.start) stage.end = stage.start;
+    }
+
+    // consecutive windows must not overlap; leave room for the blend between them
+    for (let i = 0; i < this.nodes.length - 1; i++) {
+      const a = this.nodes[i];
+      const b = this.nodes[i + 1];
+      const gap = (b.kind === "stage" ? STAGE_GAP_VH : GAP_VH) * this.vh;
+      const aEnd = a.pin ? a.holdEnd : a.end;
+      if (aEnd > b.start - gap) {
+        const m = (aEnd + b.start) / 2;
+        if (!a.pin && a.kind !== "stage") a.end = Math.max(a.start, m - gap / 2);
+        b.start = Math.max(aEnd + gap, m + gap / 2);
+        if (b.end < b.start) b.end = b.start;
+      }
     }
 
     this.pathLength = 0;
@@ -381,21 +440,53 @@ export class LineEngine {
     this.dirty = true;
   }
 
+  /** the stage's shape at scroll s: segment or icon, or the morph between two steps */
+  private stageShape(s: number, out: LineState): LineState {
+    const steps = this.stageSteps;
+    let k = -1;
+    let p = 0;
+    for (let i = 0; i < steps.length; i++) {
+      const prog = clamp((STAGE_MORPH_FROM * this.vh - (steps[i].docTop - s)) / ((STAGE_MORPH_FROM - STAGE_MORPH_TO) * this.vh));
+      if (prog <= 0) break;
+      k = i;
+      p = prog;
+    }
+    if (k < 0) return copyState(this.stageSegment, out);
+    const from = k === 0 ? this.stageSegment : steps[k - 1].shape;
+    return this.morphViaSegment(out, from, steps[k].shape, p);
+  }
+
   /**
-   * A node's shape at scroll s. With an icon: the straight line pulled into the
-   * icon as the chapter headline passes 60% of the viewport, released again
-   * from 32% down to 20% (section 5, choreography rows 6 to 9).
+   * One icon into the next: the thread first settles back into the segment,
+   * then rises into the new shape. A direct point-to-point morph between two
+   * icons passes through a tangle halfway; through the flat line it reads as
+   * one thread letting go and taking the next form. The change travels along
+   * the thread from its start to its end.
    */
+  private morphViaSegment(out: LineState, from: LineState, to: LineState, p: number): LineState {
+    const seg = this.stageSegment;
+    if (from === seg || to === seg) return morphInto(out, from, to, p, "thread");
+    if (p < STAGE_SETTLE) return morphInto(out, from, seg, p / STAGE_SETTLE, "thread");
+    return morphInto(out, seg, to, (p - STAGE_SETTLE) / (1 - STAGE_SETTLE), "thread");
+  }
+
+  /** the stage's opacity: quieter before the chapters and after them */
+  private stageOpacity(s: number): number {
+    const steps = this.stageSteps;
+    if (steps.length === 0) return STAGE_OPACITY[1];
+    const prog = (i: number) =>
+      clamp((STAGE_MORPH_FROM * this.vh - (steps[i].docTop - s)) / ((STAGE_MORPH_FROM - STAGE_MORPH_TO) * this.vh));
+    const last = steps.length - 1;
+    return lerp(lerp(STAGE_OPACITY[0], STAGE_OPACITY[1], prog(0)), STAGE_OPACITY[2], prog(last));
+  }
+
   private shapeOf(n: Node, s: number, out: LineState): LineState {
-    const base = this.states[n.shape];
-    if (!n.icon) return copyState(base, out);
-    // the headline drives the icon; where a layout puts it far below the label
-    // (Automationen), a point just under the label takes over so the icon still forms
-    const ref = Math.min(n.icon.headlineDocY, n.docY + 0.22 * this.vh);
-    const hy = (ref - s) / this.vh;
-    const form = clamp((0.6 - hy) / 0.15);
-    const release = clamp((0.36 - hy) / 0.12);
-    return morphInto(out, base, n.icon.state, form * (1 - release), "ltr");
+    if (n.kind === "stage") return this.stageShape(s, out);
+    return copyState(this.states[n.shape], out);
+  }
+
+  private opacityOf(n: Node, s: number): number {
+    return n.kind === "stage" ? this.stageOpacity(s) : n.opacity;
   }
 
   /** shape, baseline and opacity of the line at scroll position s */
@@ -410,19 +501,26 @@ export class LineEngine {
       this.shapeOf(n, s, this.work);
       // the last anchor keeps riding to the page end, but never up under the nav
       const y = next ? this.yAt(n, s) : Math.max(RIDE_TOP + 0.06, this.yAt(n, s));
-      return { y, opacity: n.opacity };
+      return { y, opacity: this.opacityOf(n, s) };
     }
 
-    // a pinned anchor morphs in place during its pin; the blend to the next anchor starts after it
-    const blendStart = n.pin ? n.pinStart + n.pinLen : n.end;
+    // a pinned anchor morphs in place during its pin (the flatten), then holds the flat shape
+    if (n.pin && s <= n.holdEnd) {
+      const um = clamp((s - n.pinStart) / Math.max(1, n.pinLen));
+      morphInto(this.work, this.shapeOf(n, s, this.tmpA), this.states[n.pinShape], um, n.pinTransition);
+      return { y: this.yAt(n, s), opacity: this.opacityOf(n, s) };
+    }
+
+    // the blend to the next node
+    const blendStart = n.pin ? n.holdEnd : n.end;
     const range = Math.max(1, next.start - blendStart);
-    const u = easeInOutQuad(clamp((s - blendStart) / range));
-    const morphLen = n.pin ? n.pinLen : range;
-    const um = clamp((s - n.end) / Math.max(1, morphLen));
-    morphInto(this.work, this.shapeOf(n, s, this.tmpA), this.shapeOf(next, s, this.tmpB), um, next.transition);
+    const u = clamp((s - blendStart) / range);
+    const from = n.pin ? copyState(this.states[n.pinShape], this.tmpA) : this.shapeOf(n, s, this.tmpA);
+    morphInto(this.work, from, this.shapeOf(next, s, this.tmpB), u, next.transition);
+    const ue = easeInOutQuad(u);
     return {
-      y: lerp(this.yAt(n, s), this.yAt(next, s), u),
-      opacity: lerp(n.opacity, next.opacity, u),
+      y: lerp(this.yAt(n, s), this.yAt(next, s), ue),
+      opacity: lerp(this.opacityOf(n, s), this.opacityOf(next, s), ue),
     };
   }
 
@@ -515,7 +613,7 @@ export class LineEngine {
       let offset: number;
       if (s < n.start) {
         offset = 0;
-      } else if (s <= n.end || (n.pin && s <= n.pinStart + n.pinLen)) {
+      } else if (s <= n.end || (n.pin && s <= n.holdEnd)) {
         let top = tops.get(n);
         if (top === undefined) {
           top = n.el.getBoundingClientRect().top;

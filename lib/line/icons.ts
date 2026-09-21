@@ -22,56 +22,94 @@ function arc(cx: number, cy: number, r: number, fromDeg: number, toDeg: number, 
   return out;
 }
 
-/** Websites: a browser window, rectangle clockwise, one short inner stroke for the address bar */
+/**
+ * Websites: a browser window. Up the left edge with two text lines and the
+ * address field drawn on the way, across the top, the title bar divider, down
+ * the right edge, and out along the bottom (retraced).
+ */
 const browser: Pt[] = [
   [0, 1],
-  [0.1, 1],
-  [0.1, 0.36],
-  [0.44, 0.36],
-  [0.1, 0.36],
-  [0.1, 0.18],
-  [0.9, 0.18],
-  [0.9, 1],
-  [0.1, 1],
+  [0.08, 1],
+  [0.08, 0.74],
+  [0.5, 0.74], // text line
+  [0.08, 0.74],
+  [0.08, 0.6],
+  [0.68, 0.6], // text line
+  [0.08, 0.6],
+  [0.08, 0.36],
+  [0.4, 0.36], // address field
+  [0.4, 0.28],
+  [0.08, 0.28],
+  [0.08, 0.2],
+  [0.92, 0.2], // title bar divider
+  [0.08, 0.2],
+  [0.08, 0.06],
+  [0.92, 0.06],
+  [0.92, 1],
+  [0.08, 1],
   [1, 1],
 ];
 
-/** Automationen: two interlocking loops, the thread feeding back into itself */
-const loops: Pt[] = [
-  [0, 1],
-  [0.3, 1],
-  ...arc(0.3, 0.7, 0.3, 90, 450, 32).slice(1),
-  [0.7, 1],
-  ...arc(0.7, 0.7, 0.3, 90, -270, 32).slice(1),
-  [1, 1],
-];
+/**
+ * Automationen: the thread feeding back into itself, a figure of eight made of
+ * two overlapping loops that stand on the baseline: up into the left loop,
+ * across the crossing into the right loop, back down to the baseline.
+ */
+const loops: Pt[] = (() => {
+  // a lemniscate (figure of eight) whose two lobes touch the baseline; the thread
+  // enters at the left lobe's lowest point, runs the whole figure through the
+  // centre crossing twice, and leaves the same point moving right
+  const a = 0.8;
+  const cy = 1 - a / 2;
+  const pts: Pt[] = [[0, 1]];
+  const steps = 96;
+  const t0 = (7 * Math.PI) / 4;
+  for (let i = 0; i <= steps; i++) {
+    const t = t0 + (2 * Math.PI * i) / steps;
+    pts.push([0.5 + 0.5 * Math.sin(t), cy - (a / 2) * Math.sin(2 * t)]);
+  }
+  pts.push([1, 1]);
+  return pts;
+})();
 
-/** Backoffice: a sheet of paper with a folded corner */
+/**
+ * Backoffice: a sheet of paper with a folded corner and three lines of text,
+ * the fold traced twice.
+ */
 const sheet: Pt[] = [
   [0, 1],
-  [0.22, 1],
-  [0.78, 1],
-  [0.78, 0.34],
-  [0.6, 0.16],
-  [0.6, 0.34],
-  [0.78, 0.34],
-  [0.6, 0.16],
-  [0.22, 0.16],
-  [0.22, 1],
+  [0.24, 1],
+  [0.76, 1],
+  [0.76, 0.3],
+  [0.6, 0.14],
+  [0.6, 0.3],
+  [0.76, 0.3],
+  [0.6, 0.14],
+  [0.24, 0.14],
+  [0.24, 0.42],
+  [0.6, 0.42], // text
+  [0.24, 0.42],
+  [0.24, 0.56],
+  [0.62, 0.56], // text
+  [0.24, 0.56],
+  [0.24, 0.7],
+  [0.5, 0.7], // text
+  [0.24, 0.7],
+  [0.24, 1],
   [1, 1],
 ];
 
 /** Beratung & Schulung: a speech bubble with a small tail, the simplest of the four */
 const bubble: Pt[] = (() => {
   const r = 0.12;
-  const top = 0.2;
-  const bottom = 0.72;
-  const left = 0.1;
-  const right = 0.9;
+  const top = 0.14;
+  const bottom = 0.7;
+  const left = 0.08;
+  const right = 0.92;
   return [
     [0, 1],
     [0.22, 1], // tail tip on the baseline
-    [0.36, bottom],
+    [0.38, bottom],
     ...arc(right - r, bottom - r, r, 90, 0, 6), // bottom-right corner
     ...arc(right - r, top + r, r, 0, -90, 6), // top-right
     ...arc(left + r, top + r, r, -90, -180, 6), // top-left
@@ -93,16 +131,25 @@ export interface IconBox {
   h: number;
 }
 
-function polylineLength(pts: Pt[]): number {
-  let l = 0;
-  for (let i = 1; i < pts.length; i++) l += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-  return l;
+/**
+ * How the N points are shared between the baseline left of the icon, the icon
+ * itself and the baseline right of it. Every stage state uses the same
+ * partition, so point i always sits at the same fraction of the stroke and a
+ * morph between two icons is a true morph, not a reshuffle.
+ */
+export interface Partition {
+  left: number;
+  icon: number;
+  right: number;
 }
 
+/** the stage's partition: most points go to the icon, the short baseline stubs need few */
+export const STAGE_PARTITION: Partition = { left: 20, icon: N - 40, right: 20 };
+
 /**
- * Builds the state "straight line with this icon standing on it": the icon
- * gets as many points as its stroke needs at the baseline's point spacing,
- * the remaining points stay on the baseline left and right of it.
+ * Builds the state "a straight line from xMin to xMax with this icon standing
+ * on it". The icon's points are spaced evenly by arc length; the remaining
+ * points stay on the baseline left and right of the box.
  */
 export function iconState(
   icon: Pt[],
@@ -111,18 +158,10 @@ export function iconState(
   vh: number,
   xMin: number,
   xMax: number,
+  partition: Partition = STAGE_PARTITION,
 ): LineState {
+  const { left: nl, icon: m, right: nr } = partition;
   const boxPx = icon.map(([x, y]) => [x * box.w * vw, y * box.h * vh] as Pt);
-  const iconLen = polylineLength(boxPx);
-  const baselineLen = (xMax - xMin) * vw;
-  const spacing = baselineLen / (N - 1);
-  const m = Math.max(40, Math.min(150, Math.round(iconLen / spacing)));
-  const leftLen = (box.x0 - xMin) * vw;
-  const rightLen = (xMax - box.x0 - box.w) * vw;
-  const rest = N - m;
-  const nl = Math.max(2, Math.round((rest * leftLen) / (leftLen + rightLen)));
-  const nr = Math.max(2, rest - nl);
-
   const iconPts = resampleByArcLength(boxPx, m);
   const s = emptyState();
   let i = 0;
@@ -140,4 +179,24 @@ export function iconState(
     s.dy[i] = 0;
   }
   return s;
+}
+
+/**
+ * The plain segment from xMin to xMax with the same partition as the icons:
+ * the icon's points lie flat across the box, so a morph from the segment into
+ * an icon lifts the thread out of the baseline instead of sliding it sideways.
+ */
+export function segmentState(
+  box: IconBox,
+  vw: number,
+  vh: number,
+  xMin: number,
+  xMax: number,
+  partition: Partition = STAGE_PARTITION,
+): LineState {
+  const flat: Pt[] = [
+    [0, 1],
+    [1, 1],
+  ];
+  return iconState(flat, box, vw, vh, xMin, xMax, partition);
 }

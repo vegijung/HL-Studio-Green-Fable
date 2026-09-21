@@ -15,7 +15,7 @@ export interface LineState {
   dy: Float64Array;
 }
 
-export type MorphMode = "ltr" | "outside-in";
+export type MorphMode = "ltr" | "outside-in" | "thread";
 
 /** the straight line runs a little past both viewport edges */
 export const X_MIN = -0.05;
@@ -113,13 +113,15 @@ export function scaleState(s: LineState, k: number): LineState {
  * x position, so a shape forms as tension travelling along the thread.
  *   ltr:        t_i = clamp(u * 1.4 - x_i * 0.4)   left to right
  *   outside-in: the outer points move first, the centre last
+ *   thread:     the delay follows the stroke order, so the change travels
+ *               along the thread from its start to its end (the stage icons)
  */
 export function morphInto(out: LineState, a: LineState, b: LineState, u: number, mode: MorphMode): LineState {
   if (u <= 0) return copyState(a, out);
   if (u >= 1) return copyState(b, out);
   for (let i = 0; i < N; i++) {
     const x = clamp(a.x[i]);
-    const lag = mode === "ltr" ? x : 1 - 2 * Math.abs(x - 0.5);
+    const lag = mode === "ltr" ? x : mode === "thread" ? i / (N - 1) : 1 - 2 * Math.abs(x - 0.5);
     const ti = easeInOutQuad(clamp(u * 1.4 - lag * 0.4));
     out.x[i] = lerp(a.x[i], b.x[i], ti);
     out.dy[i] = lerp(a.dy[i], b.dy[i], ti);

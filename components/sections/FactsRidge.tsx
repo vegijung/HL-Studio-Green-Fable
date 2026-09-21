@@ -146,7 +146,15 @@ export function FactsRidge({ facts }: { facts: Fact[] }) {
       style={{ height: layout ? layout.height : "55vh" }}
     >
       <div className="absolute inset-x-0" style={{ top: layout ? layout.baseline : "60%" }}>
-        <Hairline anchor="facts" shape="ridge-facts" pin="60%" pinTarget="#fakten" pinAt={0.42} />
+        <Hairline
+          anchor="facts"
+          shape="ridge-facts"
+          pin="60%"
+          pinTarget="#fakten"
+          pinAt={0.42}
+          pinShape="straight"
+          release={0.14}
+        />
       </div>
 
       {layout?.spots.map((spot, i) => {
