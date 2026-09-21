@@ -13,9 +13,9 @@
  *     --debug <file>      default assets/reference/ridge-debug.png
  *     --contrast <0..1>   how far below the sky a pixel must fall, as a fraction
  *                         of the column's sky-to-dark range. default 0.35
- *     --run <px>          consecutive dark pixels required. default 4
+ *     --run <px>          consecutive dark pixels required. default 4 per 1536px of width
  *     --points <n>        target point count after simplification. default 80
- *     --median <px>       median filter window. default 9
+ *     --median <px>       median filter window. default 9 per 1536px of width
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -36,9 +36,7 @@ if (!input || input.startsWith("--")) {
 const outFile = arg("out", "content/ridge.json");
 const debugFile = arg("debug", "assets/reference/ridge-debug.png");
 const contrast = Number(arg("contrast", "0.35"));
-const minRun = Number(arg("run", "4"));
 const targetPoints = Number(arg("points", "80"));
-const medianWindow = Number(arg("median", "9"));
 
 const { data, info } = await sharp(input)
   .greyscale()
@@ -46,6 +44,11 @@ const { data, info } = await sharp(input)
   .toBuffer({ resolveWithObject: true });
 const W = info.width;
 const H = info.height;
+
+// pixel-based defaults were tuned on a 1536px image; scale them with the width
+const scale = Math.max(1, W / 1536);
+const minRun = Number(arg("run", String(Math.round(4 * scale))));
+const medianWindow = Number(arg("median", String(Math.round(9 * scale) | 1)));
 const lum = (x: number, y: number) => data[y * W + x];
 
 function median(values: number[]): number {
@@ -145,14 +148,15 @@ writeFileSync(
 );
 
 // 5. debug overlay: raw ridge in red, simplified polyline in cyan with its points
+const unit = Math.max(1, W / 1536); // stroke widths scale with image size
 const rawPath = filtered.map((y, x) => `${x},${y}`).join(" ");
 const simplePath = simplified.map(([x, y]) => `${x},${y}`).join(" ");
 const dots = simplified
-  .map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3" fill="none" stroke="#00e5ff" stroke-width="1"/>`)
+  .map(([x, y]) => `<circle cx="${x}" cy="${y}" r="${3 * unit}" fill="none" stroke="#00e5ff" stroke-width="${unit}"/>`)
   .join("");
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
-  <polyline points="${rawPath}" fill="none" stroke="#ff2020" stroke-width="2"/>
-  <polyline points="${simplePath}" fill="none" stroke="#00e5ff" stroke-width="1"/>
+  <polyline points="${rawPath}" fill="none" stroke="#ff2020" stroke-width="${2 * unit}"/>
+  <polyline points="${simplePath}" fill="none" stroke="#00e5ff" stroke-width="${unit}"/>
   ${dots}
 </svg>`;
 mkdirSync(path.dirname(debugFile), { recursive: true });

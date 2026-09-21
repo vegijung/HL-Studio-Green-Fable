@@ -22,15 +22,19 @@ npm run dev
 
 ## Hero image and ridge
 
-The hero photograph is `public/hero/bietschhorn.png` (a generated placeholder until a licensed photo replaces it). Its skyline lives in `content/ridge.json` as normalised coordinates and is projected onto the rendered image through the cover math in `lib/ridge.ts`. Append `?ridge=1` to the home URL to see the ridge drawn over the photo.
+The hero photograph is `public/hero/bietschhorn.jpg`, a 6336px Gemini render prepared from `assets/hero-variants/bietschhorn-03-4k.jpg`. It is a placeholder until a licensed photo replaces it. Its skyline lives in `content/ridge.json` as normalised coordinates and is projected onto the rendered image through the cover math in `lib/ridge.ts`. Append `?ridge=1` to the home URL to see the ridge drawn over the photo.
 
-To swap the photo, replace the file and re-run the extraction:
+To swap the photo, prepare it (optional: darkens the valley band and applies the cold, near-monochrome grade) and re-run the extraction:
 
 ```bash
-node scripts/extract-ridge.ts public/hero/bietschhorn.png
+node scripts/prepare-hero.ts path/to/new-photo.jpg public/hero/bietschhorn.jpg
 ```
 
-It writes `content/ridge.json` and a debug overlay to `assets/reference/ridge-debug.png`; check that the red line sits on the ridge and tune `--contrast` if it does not. If the new photo's lower third is too bright for the headline, `scripts/prepare-hero.ts` darkens that band deterministically before extraction.
+```bash
+node scripts/extract-ridge.ts public/hero/bietschhorn.jpg
+```
+
+The extraction writes `content/ridge.json` and a debug overlay to `assets/reference/ridge-debug.png`; check that the red line sits on the ridge and tune `--contrast` if it does not. The hero reads the file name from `ridge.json`, so both scripts must run on the same file.
 
 ## Phases
 
