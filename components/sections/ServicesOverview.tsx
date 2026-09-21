@@ -25,7 +25,7 @@ export function ServicesOverview({ content }: { content: SiteContent["services"]
             </li>
           ))}
         </ul>
-        <Hairline className="mt-10 opacity-60" />
+        <Hairline anchor="services" opacity={0.6} className="mt-10 opacity-60" />
       </nav>
     </Section>
   );

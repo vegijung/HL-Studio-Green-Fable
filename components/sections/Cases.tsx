@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { Grid } from "@/components/Container";
+import { Hairline } from "@/components/Hairline";
 import { Section, SectionHead } from "@/components/Section";
 import type { Case, Metric, SiteContent } from "@/content/types";
 
@@ -15,12 +16,12 @@ function Figure({ metric, align }: { metric: Metric; align: "left" | "right" }) 
 }
 
 /** before → after, set on a hairline that acts as the axis (the line, in phase 3) */
-function BeforeAfter({ item }: { item: Case }) {
+function BeforeAfter({ item, index }: { item: Case; index: number }) {
   return (
     <div className="flex items-start gap-6">
       <Figure metric={item.before} align="left" />
       <div aria-hidden className="relative mt-4 flex flex-1 items-center">
-        <div data-line-placeholder className="h-px w-full bg-fog" />
+        <Hairline anchor={`case-${index + 1}`} opacity={0.4} />
         <svg
           viewBox="0 0 8 12"
           width="8"
@@ -50,19 +51,23 @@ export function Cases({ content }: { content: SiteContent["cases"] }) {
             <Grid className="gap-y-8">
               <div className="col-span-12 lg:col-span-3">
                 {item.logo ? (
-                  <Image src={item.logo} alt={item.sector} width={120} height={40} className="h-8 w-auto" />
+                  <Image src={item.logo} alt={item.sector} width={120} height={40} className="h-8 w-auto" data-line-gap />
                 ) : (
-                  <p className="label text-charcoal/60">{item.sector}</p>
+                  <p className="label text-charcoal/60" data-line-gap>
+                    {item.sector}
+                  </p>
                 )}
               </div>
               <div className="col-span-12 lg:col-span-4">
                 <h3 className="display-lead" data-line-gap>
                   {item.title}
                 </h3>
-                <p className="body-text mt-6 text-[16px] text-charcoal/80">{item.text}</p>
+                <p className="body-text mt-6 text-[16px] text-charcoal/80" data-line-gap>
+                  {item.text}
+                </p>
               </div>
               <div className="col-span-12 lg:col-span-4 lg:col-start-9">
-                <BeforeAfter item={item} />
+                <BeforeAfter item={item} index={content.items.indexOf(item)} />
               </div>
             </Grid>
           </li>

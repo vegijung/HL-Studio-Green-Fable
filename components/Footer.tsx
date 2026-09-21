@@ -5,11 +5,12 @@ import { contact } from "@/content/contact";
 import { channelHref } from "@/lib/contact";
 import type { SiteContent } from "@/content/types";
 
+/** the footer sits inside the dark closing on the home page and on its own on subpages */
 export function Footer({ content }: { content: SiteContent["footer"] }) {
   return (
     <footer className="bg-night text-ivory">
       <Container>
-        <div className="flex flex-col gap-16 border-t border-ivory/10 py-20 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col gap-16 border-t border-ivory/10 py-12 lg:flex-row lg:items-end lg:justify-between lg:py-14">
           <Logo variant="stacked" className="h-20" />
 
           <div className="grid gap-x-16 gap-y-10 text-[15px] leading-relaxed text-ivory/80 sm:grid-cols-2 lg:grid-cols-3">

@@ -10,7 +10,7 @@ export function Prices({ content }: { content: SiteContent["prices"] }) {
     <Section id="preise">
       <SectionHead label={content.label} title={content.h2} text={content.text} />
 
-      <Hairline className="mt-24 lg:mt-32" />
+      <Hairline anchor="prices" opacity={0.4} className="mt-24 lg:mt-32" />
 
       <div className="grid gap-y-16 lg:grid-cols-3 lg:gap-y-0">
         {content.columns.map((column, i) => (

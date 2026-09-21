@@ -50,6 +50,12 @@
     }
   }
 
+  /* anchor targets stop below the fixed nav */
+  section[id],
+  div[id] {
+    scroll-margin-top: var(--nav-height);
+  }
+
   body {
     background-color: var(--ivory);
     color: var(--charcoal);
@@ -71,6 +77,46 @@
     height: 100%;
     width: auto;
   }
+}
+
+/* ---- line engine hooks ------------------------------------------------- */
+
+/* the engine replaces the static hairlines on desktop; they keep their space */
+html[data-line="on"] [data-line-placeholder] {
+  visibility: hidden;
+}
+html[data-line="on"] [data-facts-static] {
+  display: none;
+}
+html:not([data-line="on"]) [data-facts-ridge] {
+  display: none;
+}
+
+/* hero: the variables are driven by lib/line/hero.ts, defaults keep it static */
+#hero {
+  background-color: color-mix(
+    in srgb,
+    var(--ivory) calc(var(--surface-mix, 0) * 100%),
+    var(--charcoal)
+  );
+}
+[data-hero-photo] {
+  opacity: calc(var(--photo-in, 1) * var(--photo-out, 1));
+  transform: scale(var(--hero-scale, 1));
+  transform-origin: center;
+  will-change: opacity, transform;
+}
+[data-hero-content] {
+  opacity: calc(var(--text-in, 1) * var(--content-out, 1));
+  transform: translateY(calc((1 - var(--text-in, 1)) * 16px));
+}
+/* set before first paint on desktop: the opening starts dark and fades things in */
+html[data-opening] #hero {
+  --photo-in: 0;
+  --text-in: 0;
+}
+html[data-opening] [data-nav] {
+  color: var(--ivory);
 }
 
 /* Inter, uppercase, 11px, 0.14em tracking */

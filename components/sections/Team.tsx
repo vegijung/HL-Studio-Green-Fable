@@ -43,7 +43,7 @@ export function Team({ content }: { content: SiteContent["team"] }) {
         </div>
       </Grid>
 
-      <Hairline className="mt-20 lg:mt-28" />
+      <Hairline anchor="team" className="mt-20 lg:mt-28" />
     </Section>
   );
 }

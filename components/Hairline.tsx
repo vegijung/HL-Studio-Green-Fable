@@ -1,20 +1,49 @@
 import { cx } from "@/lib/cx";
 
 /**
- * Phase 1 stand-in for the line: a static 1px fog rule where the line will run.
- * Marked with data-line-placeholder so the engine can find and replace them in phase 3.
+ * A static 1px rule where the line runs. Two jobs:
+ *   - below 1024px and under reduced motion it is the visible line
+ *   - on desktop the engine hides it and, if `anchor` is set, uses its position
+ *     as the anchor the line rides through this section
  */
 export function Hairline({
   tone = "fog",
   className,
+  anchor,
+  shape = "straight",
+  opacity = 1,
+  transition,
+  pin,
+  pinTarget,
+  pinAt,
 }: {
   tone?: "fog" | "ivory" | "forest";
   className?: string;
+  /** unique name; makes this rule an anchor for the line engine */
+  anchor?: string;
+  /** shape the line takes while riding this anchor */
+  shape?: "ridge" | "ridge-facts" | "straight";
+  /** stroke opacity while riding this anchor */
+  opacity?: number;
+  /** how the morph into this anchor's shape travels along the thread */
+  transition?: "ltr" | "outside-in";
+  /** pin the section for this scroll distance when the line reaches the anchor (e.g. "60%") */
+  pin?: string;
+  pinTarget?: string;
+  /** viewport height fraction at which the anchor sits when the pin starts (default: the ride top) */
+  pinAt?: number;
 }) {
   return (
     <div
       aria-hidden
       data-line-placeholder
+      data-line-anchor={anchor}
+      data-line-shape={anchor ? shape : undefined}
+      data-line-opacity={anchor ? opacity : undefined}
+      data-line-transition={anchor ? transition : undefined}
+      data-line-pin={anchor ? pin : undefined}
+      data-line-pin-target={anchor ? pinTarget : undefined}
+      data-line-pin-at={anchor && pinAt !== undefined ? pinAt : undefined}
       className={cx(
         "h-px w-full",
         tone === "fog" && "bg-fog",

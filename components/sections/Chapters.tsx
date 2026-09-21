@@ -14,7 +14,7 @@ import type { Service } from "@/content/types";
 
 function ChapterLabel({ service, className }: { service: Service; className?: string }) {
   return (
-    <p className={`label flex items-center gap-4 ${className ?? ""}`}>
+    <p className={`label flex items-center gap-4 ${className ?? ""}`} data-line-gap>
       <span className="text-charcoal/60">{service.index}</span>
       <span>{service.name}</span>
     </p>
@@ -25,7 +25,7 @@ function ChapterLabel({ service, className }: { service: Service; className?: st
 export function ChapterWebsites({ service }: { service: Service }) {
   return (
     <Section id={service.slug} className="lg:pb-[15rem]">
-      <Hairline />
+      <Hairline anchor={`chapter-${service.slug}`} />
       <ChapterLabel service={service} className="mt-8" />
       <Grid className="mt-20 lg:mt-28">
         <h2 className="display-statement col-span-12 lg:col-span-6" data-line-gap>
@@ -52,7 +52,7 @@ export function ChapterWebsites({ service }: { service: Service }) {
 export function ChapterAutomationen({ service }: { service: Service }) {
   return (
     <Section id={service.slug}>
-      <Hairline />
+      <Hairline anchor={`chapter-${service.slug}`} />
       <ChapterLabel service={service} className="mt-8" />
       <Grid className="mt-20 lg:mt-28">
         <div className="col-span-12 lg:col-span-5">
@@ -74,7 +74,7 @@ export function ChapterAutomationen({ service }: { service: Service }) {
 export function ChapterBackoffice({ service }: { service: Service }) {
   return (
     <Section id={service.slug}>
-      <Hairline />
+      <Hairline anchor={`chapter-${service.slug}`} />
       <ChapterLabel service={service} className="mt-8" />
       <Grid className="mt-20 lg:mt-28">
         <div className="col-span-12 lg:col-span-5">
@@ -96,7 +96,7 @@ export function ChapterBackoffice({ service }: { service: Service }) {
 export function ChapterSchulung({ service }: { service: Service }) {
   return (
     <Section id={service.slug}>
-      <Hairline />
+      <Hairline anchor={`chapter-${service.slug}`} />
       <div className="mx-auto mt-8 flex max-w-[40rem] flex-col items-center text-center">
         <ChapterLabel service={service} />
         <h2 className="display-h2 mt-20 lg:mt-28" data-line-gap>

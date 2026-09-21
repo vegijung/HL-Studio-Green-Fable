@@ -44,6 +44,7 @@ export function Nav({
 
   return (
     <header
+      data-nav
       className={cx(
         "fixed inset-x-0 top-0 z-30 h-nav transition-colors duration-300",
         overHero

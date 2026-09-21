@@ -4,7 +4,6 @@ import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { getContent } from "@/content";
 import { Nav } from "@/components/Nav";
-import { Footer } from "@/components/Footer";
 import { Logo } from "@/components/Logo";
 import { primaryHref } from "@/lib/contact";
 
@@ -32,6 +31,7 @@ export const metadata: Metadata = {
   description: content.meta.description,
 };
 
+/* the footer is rendered by the pages: inside the dark closing on the home page, after <Subpage> elsewhere */
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="de-CH" className={`${inter.variable} ${playfair.variable} h-full`}>
@@ -42,7 +42,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           cta={{ label: content.nav.cta, href: primaryHref() }}
         />
         {children}
-        <Footer content={content.footer} />
       </body>
     </html>
   );
