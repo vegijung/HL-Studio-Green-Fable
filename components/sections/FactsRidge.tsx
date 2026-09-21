@@ -22,10 +22,13 @@ const LABEL_MARGIN = 14;
 
 interface Spot {
   fact: number;
-  kind: "peak" | "saddle";
+  kind: "peak" | "saddle" | "slope";
   /** spot position in container px */
   x: number;
   bottom: number;
+  /** normalised viewport x and dy, for the engine's follow */
+  xNorm: number;
+  dy: number;
 }
 
 interface Layout {
@@ -73,6 +76,8 @@ export function FactsRidge({ facts }: { facts: Fact[] }) {
     const el = ref.current;
     if (!el) return;
     const compute = () => {
+      // hidden until the engine switches the layout on; measuring now would read a zero offset
+      if (el.getBoundingClientRect().width === 0) return;
       const vw = window.innerWidth;
       const vh = window.innerHeight;
       const hero = document.getElementById("hero");
@@ -100,12 +105,26 @@ export function FactsRidge({ facts }: { facts: Fact[] }) {
           kind: s.kind,
           x: s.x * vw - left,
           bottom: height - (baseline + s.dy * vh),
+          xNorm: s.x,
+          dy: s.dy,
         })),
       });
     };
     compute();
+    // the ridge depends on the hero box, which settles when fonts and layout do
     window.addEventListener("resize", compute);
-    return () => window.removeEventListener("resize", compute);
+    document.fonts?.ready.then(compute);
+    const hero = document.getElementById("hero");
+    const observer = hero ? new ResizeObserver(compute) : null;
+    if (hero && observer) observer.observe(hero);
+    // the engine sets html[data-line="on"], which shows this layout
+    const flag = new MutationObserver(compute);
+    flag.observe(document.documentElement, { attributes: true, attributeFilter: ["data-line"] });
+    return () => {
+      window.removeEventListener("resize", compute);
+      observer?.disconnect();
+      flag.disconnect();
+    };
   }, [facts]);
 
   // second pass: measure the rendered labels and push them apart
@@ -134,7 +153,13 @@ export function FactsRidge({ facts }: { facts: Fact[] }) {
         const fact = facts[spot.fact];
         const wrap = fact.value.length > 8;
         return (
-          <div key={fact.value}>
+          <div
+            key={fact.value}
+            data-line-follow="facts"
+            data-line-follow-x={spot.xNorm.toFixed(4)}
+            data-line-follow-dy={spot.dy.toFixed(4)}
+            className="pointer-events-none absolute inset-0 will-change-transform"
+          >
             <span
               aria-hidden
               className="absolute w-px bg-fog"

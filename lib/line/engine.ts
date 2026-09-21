@@ -78,6 +78,16 @@ interface Gap {
   group: HTMLElement | null;
 }
 
+/** an element that keeps its vertical position glued to the line (the facts annotations) */
+interface Follower {
+  el: HTMLElement;
+  /** normalised viewport x of the point it marks */
+  x: number;
+  /** the point's dy (fraction of vh) in the anchor's own shape */
+  dy: number;
+  node: Node | null;
+}
+
 export class LineEngine {
   /** 0..1 while the opening draws the line in; 1 afterwards */
   drawProgress = 1;
@@ -102,6 +112,7 @@ export class LineEngine {
   private nodes: Node[] = [];
   private sections: Section[] = [];
   private gaps: Gap[] = [];
+  private followers: Follower[] = [];
 
   private vw = 0;
   private vh = 0;
@@ -235,10 +246,16 @@ export class LineEngine {
     this.vw = window.innerWidth;
     this.vh = window.innerHeight;
 
-    // gaps are collected here, not in build(), because some text (the facts) renders after start
+    // gaps and followers are collected here, not in build(), because the facts render after start
     this.gaps = Array.from(document.querySelectorAll<HTMLElement>("[data-line-gap]")).map((el) => ({
       el,
       group: el.closest<HTMLElement>("[data-line-gap-group]"),
+    }));
+    this.followers = Array.from(document.querySelectorAll<HTMLElement>("[data-line-follow]")).map((el) => ({
+      el,
+      x: Number(el.dataset.lineFollowX),
+      dy: Number(el.dataset.lineFollowDy),
+      node: this.nodes.find((n) => n.el?.dataset.lineAnchor === el.dataset.lineFollow) ?? null,
     }));
     this.svg.setAttribute("viewBox", `0 0 ${this.vw} ${this.vh}`);
     this.maskBg.setAttribute("width", String(this.vw));
@@ -357,6 +374,7 @@ export class LineEngine {
     }
     this.path.setAttribute("d", catmullRomPath(this.xs, this.ys));
     this.path.setAttribute("stroke-opacity", opacity.toFixed(3));
+    this.updateFollowers(s, y);
 
     // colour follows the surface under the line's baseline
     const docY = y * this.vh + s;
@@ -381,6 +399,46 @@ export class LineEngine {
       `rgb(${Math.round(this.color[0])} ${Math.round(this.color[1])} ${Math.round(this.color[2])})`,
     );
     this.dirty = remaining > 0.5;
+  }
+
+  /** dy of the current shape at a normalised x, by linear interpolation */
+  private dyAt(x: number): number {
+    const xs = this.work.x;
+    const dys = this.work.dy;
+    if (x <= xs[0]) return dys[0];
+    if (x >= xs[N - 1]) return dys[N - 1];
+    let i = 1;
+    while (i < N - 1 && xs[i] < x) i++;
+    const t = (x - xs[i - 1]) / (xs[i] - xs[i - 1] || 1);
+    return lerp(dys[i - 1], dys[i], t);
+  }
+
+  /**
+   * Followers stay glued to the line: while the line rides or pins on their
+   * anchor they are shifted so their point sits on the current shape; before
+   * that they rest at their ridge positions, afterwards on the flattened line.
+   */
+  private updateFollowers(s: number, y: number) {
+    const tops = new Map<Node, number>();
+    for (const f of this.followers) {
+      const n = f.node;
+      if (!n || !n.el) continue;
+      let offset: number;
+      if (s < n.start) {
+        offset = 0;
+      } else if (s <= n.end || (n.pin && s <= n.pinStart + n.pinLen)) {
+        let top = tops.get(n);
+        if (top === undefined) {
+          top = n.el.getBoundingClientRect().top;
+          tops.set(n, top);
+        }
+        const lineY = (y + this.dyAt(f.x)) * this.vh;
+        offset = lineY - (top + f.dy * this.vh);
+      } else {
+        offset = -f.dy * this.vh;
+      }
+      f.el.style.transform = `translate3d(0, ${offset.toFixed(2)}px, 0)`;
+    }
   }
 
   /** stroke-dashoffset draw-in during the opening */

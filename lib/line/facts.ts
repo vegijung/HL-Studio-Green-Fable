@@ -6,12 +6,12 @@
  * programming over the candidates in x order), with the highest peak forced
  * in: it gets "5 Tage". Returned in left-to-right order.
  */
-import { findExtrema, type Extremum, type LineState } from "./states";
+import { dyAtX, findExtrema, type Extremum, type LineState } from "./states";
 
 export interface FactSpot {
   x: number;
   dy: number;
-  kind: "peak" | "saddle";
+  kind: "peak" | "saddle" | "slope";
   /** index into the facts array */
   fact: number;
 }
@@ -67,6 +67,22 @@ export function pickFactSpots(state: LineState, count: number, widths?: number[]
   for (const spacing of [0.16, 0.14, MIN_SPACING, 0.1, 0.085]) {
     chosen = bestSet(weighted, count, spacing);
     if (chosen.length >= count) break;
+  }
+
+  // not enough separated extrema (a long slope): annotate a point in the widest empty stretch
+  while (chosen.length < count) {
+    const xs = [X_MIN, ...chosen.map((e) => e.x), X_MAX];
+    let gapStart = 0;
+    let gapWidth = 0;
+    for (let i = 1; i < xs.length; i++) {
+      if (xs[i] - xs[i - 1] > gapWidth) {
+        gapWidth = xs[i] - xs[i - 1];
+        gapStart = xs[i - 1];
+      }
+    }
+    const x = gapStart + gapWidth / 2;
+    chosen.push({ index: -1, x, dy: dyAtX(state, x), kind: "slope", prominence: 0 });
+    chosen.sort((a, b) => a.x - b.x);
   }
 
   const summitIndex = chosen.findIndex((e) => e.x === summit.x);

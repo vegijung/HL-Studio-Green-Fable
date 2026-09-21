@@ -42,20 +42,21 @@ export function Hero({ content }: { content: SiteContent["hero"] }) {
       </div>
       <HeroRidgeDebug />
 
-      <Container className="pb-24 pt-40 lg:pb-28">
+      {/* the copy starts below 36% of the viewport so the ridge never runs behind it at rest */}
+      <Container className="mt-[36svh] pb-12">
         <div data-hero-content data-line-gap-group>
           <Grid>
             <div className="col-span-12 lg:col-span-8">
-              <p className="label mb-8 text-ivory/80" data-line-gap>
+              <p className="label mb-6 text-ivory/80" data-line-gap>
                 {content.label}
               </p>
               <h1 className="display-h1" data-line-gap>
                 <Lines text={content.h1} />
               </h1>
-              <p className="body-text-lg mt-10 text-ivory/85 lg:max-w-[52ch]" data-line-gap>
+              <p className="body-text-lg mt-8 text-ivory/85 lg:max-w-[52ch]" data-line-gap>
                 {content.sub}
               </p>
-              <div className="mt-12 flex flex-wrap items-center gap-x-10 gap-y-4" data-line-gap>
+              <div className="mt-10 flex flex-wrap items-center gap-x-10 gap-y-4" data-line-gap>
                 <Cta label={content.ctaPrimary} variant="solid" />
                 <Cta label={content.ctaSecondary.label} href={content.ctaSecondary.href} variant="text" />
               </div>

@@ -102,8 +102,18 @@ export interface Extremum {
   index: number;
   x: number;
   dy: number;
-  kind: "peak" | "saddle";
+  kind: "peak" | "saddle" | "slope";
   prominence: number;
+}
+
+/** dy of a state at a normalised x, by linear interpolation (x must be monotonic) */
+export function dyAtX(s: LineState, x: number): number {
+  if (x <= s.x[0]) return s.dy[0];
+  if (x >= s.x[N - 1]) return s.dy[N - 1];
+  let i = 1;
+  while (i < N - 1 && s.x[i] < x) i++;
+  const t = (x - s.x[i - 1]) / (s.x[i] - s.x[i - 1] || 1);
+  return lerp(s.dy[i - 1], s.dy[i], t);
 }
 
 /** local extrema of a state's height profile, for placing annotations */
