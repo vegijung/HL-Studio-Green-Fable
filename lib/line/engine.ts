@@ -23,9 +23,12 @@ import {
   ridgeState,
   straightState,
   stretchState,
+  X_MAX,
+  X_MIN,
   type LineState,
   type MorphMode,
 } from "./states";
+import { ICONS, iconState, type IconName } from "./icons";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -46,11 +49,24 @@ const GAP_PAD = 14;
 const IVORY = [247, 245, 239];
 const FOREST = [46, 75, 63];
 
+/** an icon that forms on the line while it rides a chapter anchor */
+interface IconSpec {
+  name: IconName;
+  slot: HTMLElement;
+  headline: HTMLElement;
+  /** document y of the headline's top, measured on refresh */
+  headlineDocY: number;
+  state: LineState;
+}
+
 interface Node {
   el: HTMLElement | null;
   shape: ShapeName;
   opacity: number;
   transition: MorphMode;
+  /** viewport fraction where this anchor's ride ends (default RIDE_TOP) */
+  rideTop: number;
+  icon: IconSpec | null;
   ride: ScrollTrigger | null;
   pin: ScrollTrigger | null;
   /** ride window in scroll px */
@@ -106,6 +122,8 @@ export class LineEngine {
     straight: straightState(),
   };
   private work = emptyState();
+  private tmpA = emptyState();
+  private tmpB = emptyState();
   private xs = new Float64Array(N);
   private ys = new Float64Array(N);
 
@@ -193,6 +211,8 @@ export class LineEngine {
         shape: "ridge",
         opacity: 1,
         transition: "ltr",
+        rideTop: RIDE_TOP,
+        icon: null,
         ride: null,
         pin: null,
         start: 0,
@@ -206,11 +226,20 @@ export class LineEngine {
 
     const anchors = Array.from(document.querySelectorAll<HTMLElement>("[data-line-anchor]"));
     for (const el of anchors) {
+      const name = el.dataset.lineAnchor!;
+      const rideTop = el.dataset.lineRideTop ? Number(el.dataset.lineRideTop) : RIDE_TOP;
       const ride = ScrollTrigger.create({
         trigger: el,
         start: `top ${RIDE_BOTTOM * 100}%`,
-        end: `top ${RIDE_TOP * 100}%`,
+        end: `top ${rideTop * 100}%`,
       });
+      const slot = document.querySelector<HTMLElement>(`[data-line-icon-slot="${name}"]`);
+      const headline = document.querySelector<HTMLElement>(`[data-line-icon-headline="${name}"]`);
+      const iconName = slot?.dataset.lineIcon as IconName | undefined;
+      const icon: IconSpec | null =
+        slot && headline && iconName && ICONS[iconName]
+          ? { name: iconName, slot, headline, headlineDocY: 0, state: emptyState() }
+          : null;
       let pin: ScrollTrigger | null = null;
       const pinLen = el.dataset.linePin;
       if (pinLen) {
@@ -235,6 +264,8 @@ export class LineEngine {
         shape: (el.dataset.lineShape as ShapeName) || "straight",
         opacity: el.dataset.lineOpacity ? Number(el.dataset.lineOpacity) : 1,
         transition: (el.dataset.lineTransition as MorphMode) || "ltr",
+        rideTop,
+        icon,
         ride,
         pin,
         start: 0,
@@ -308,6 +339,21 @@ export class LineEngine {
         n.pinLen = n.pin.end - n.pin.start;
         n.end = n.pinStart;
       }
+      if (n.icon) {
+        // the icon stands on the line inside its slot; the headline drives its amount
+        const anchorRect = n.el.getBoundingClientRect();
+        const slotRect = n.icon.slot.getBoundingClientRect();
+        const headRect = n.icon.headline.getBoundingClientRect();
+        n.icon.headlineDocY = n.docY + (headRect.top - anchorRect.top);
+        n.icon.state = iconState(
+          ICONS[n.icon.name],
+          { x0: slotRect.left / this.vw, w: slotRect.width / this.vw, h: slotRect.height / this.vh },
+          this.vw,
+          this.vh,
+          X_MIN,
+          X_MAX,
+        );
+      }
     }
 
     // consecutive ride windows must not overlap; leave room for the blend between them
@@ -335,6 +381,23 @@ export class LineEngine {
     this.dirty = true;
   }
 
+  /**
+   * A node's shape at scroll s. With an icon: the straight line pulled into the
+   * icon as the chapter headline passes 60% of the viewport, released again
+   * from 32% down to 20% (section 5, choreography rows 6 to 9).
+   */
+  private shapeOf(n: Node, s: number, out: LineState): LineState {
+    const base = this.states[n.shape];
+    if (!n.icon) return copyState(base, out);
+    // the headline drives the icon; where a layout puts it far below the label
+    // (Automationen), a point just under the label takes over so the icon still forms
+    const ref = Math.min(n.icon.headlineDocY, n.docY + 0.22 * this.vh);
+    const hy = (ref - s) / this.vh;
+    const form = clamp((0.6 - hy) / 0.15);
+    const release = clamp((0.36 - hy) / 0.12);
+    return morphInto(out, base, n.icon.state, form * (1 - release), "ltr");
+  }
+
   /** shape, baseline and opacity of the line at scroll position s */
   private evaluate(s: number): { y: number; opacity: number } {
     const nodes = this.nodes;
@@ -344,7 +407,7 @@ export class LineEngine {
     const next = nodes[i + 1];
 
     if (s <= n.end || !next) {
-      copyState(this.states[n.shape], this.work);
+      this.shapeOf(n, s, this.work);
       // the last anchor keeps riding to the page end, but never up under the nav
       const y = next ? this.yAt(n, s) : Math.max(RIDE_TOP + 0.06, this.yAt(n, s));
       return { y, opacity: n.opacity };
@@ -356,7 +419,7 @@ export class LineEngine {
     const u = easeInOutQuad(clamp((s - blendStart) / range));
     const morphLen = n.pin ? n.pinLen : range;
     const um = clamp((s - n.end) / Math.max(1, morphLen));
-    morphInto(this.work, this.states[n.shape], this.states[next.shape], um, next.transition);
+    morphInto(this.work, this.shapeOf(n, s, this.tmpA), this.shapeOf(next, s, this.tmpB), um, next.transition);
     return {
       y: lerp(this.yAt(n, s), this.yAt(next, s), u),
       opacity: lerp(n.opacity, next.opacity, u),

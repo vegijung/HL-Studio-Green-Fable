@@ -4,20 +4,42 @@ import { Hairline } from "@/components/Hairline";
 import { Section } from "@/components/Section";
 import { Tags } from "@/components/Tags";
 import { ProcessFigure } from "@/components/ProcessFigure";
-import type { Service } from "@/content/types";
+import type { Service, ServiceSlug } from "@/content/types";
 
 /**
  * Sections 6 to 9: four service chapters, four different editorial layouts.
- * Each chapter opens with a hairline (where the line runs) and its index label
- * beside which the icon will sit in phase 4.
+ * Each chapter opens with its anchor rule. The index label sits on the rule
+ * (the line is cut around it) and the one-stroke icon forms on the line to the
+ * right of the label while the headline passes through the viewport.
  */
 
-function ChapterLabel({ service, className }: { service: Service; className?: string }) {
+const ICON_BY_SLUG: Record<ServiceSlug, "browser" | "loops" | "sheet" | "bubble"> = {
+  websites: "browser",
+  automationen: "loops",
+  backoffice: "sheet",
+  "beratung-schulung": "bubble",
+};
+
+function ChapterHead({ service, centered = false }: { service: Service; centered?: boolean }) {
+  const anchor = `chapter-${service.slug}`;
   return (
-    <p className={`label flex items-center gap-4 ${className ?? ""}`} data-line-gap>
-      <span className="text-charcoal/60">{service.index}</span>
-      <span>{service.name}</span>
-    </p>
+    <div className="relative">
+      <Hairline anchor={anchor} rideTop={0.05} />
+      <div
+        className={`absolute bottom-0 flex items-end gap-10 ${centered ? "left-1/2 -translate-x-1/2" : "left-0"}`}
+      >
+        <p className="label flex translate-y-1/2 items-center gap-4 bg-transparent" data-line-gap>
+          <span className="text-charcoal/60">{service.index}</span>
+          <span>{service.name}</span>
+        </p>
+        <span
+          aria-hidden
+          data-line-icon-slot={anchor}
+          data-line-icon={ICON_BY_SLUG[service.slug]}
+          className="block h-[120px] w-[120px]"
+        />
+      </div>
+    </div>
   );
 }
 
@@ -25,10 +47,13 @@ function ChapterLabel({ service, className }: { service: Service; className?: st
 export function ChapterWebsites({ service }: { service: Service }) {
   return (
     <Section id={service.slug} className="lg:pb-[15rem]">
-      <Hairline anchor={`chapter-${service.slug}`} />
-      <ChapterLabel service={service} className="mt-8" />
-      <Grid className="mt-20 lg:mt-28">
-        <h2 className="display-statement col-span-12 lg:col-span-6" data-line-gap>
+      <ChapterHead service={service} />
+      <Grid className="mt-24 lg:mt-32">
+        <h2
+          className="display-statement col-span-12 lg:col-span-6"
+          data-line-gap
+          data-line-icon-headline={`chapter-${service.slug}`}
+        >
           {service.headline}
         </h2>
         <div className="col-span-12 mt-12 lg:col-span-5 lg:col-start-8 lg:mt-3">
@@ -52,9 +77,8 @@ export function ChapterWebsites({ service }: { service: Service }) {
 export function ChapterAutomationen({ service }: { service: Service }) {
   return (
     <Section id={service.slug}>
-      <Hairline anchor={`chapter-${service.slug}`} />
-      <ChapterLabel service={service} className="mt-8" />
-      <Grid className="mt-20 lg:mt-28">
+      <ChapterHead service={service} />
+      <Grid className="mt-24 lg:mt-32">
         <div className="col-span-12 lg:col-span-5">
           <p className="body-text-lg">{service.text}</p>
           <Tags items={service.tags} className="mt-8" />
@@ -62,6 +86,7 @@ export function ChapterAutomationen({ service }: { service: Service }) {
         <h2
           className="display-statement col-span-12 mt-20 lg:col-span-10 lg:mt-32"
           data-line-gap
+          data-line-icon-headline={`chapter-${service.slug}`}
         >
           {service.headline}
         </h2>
@@ -74,11 +99,10 @@ export function ChapterAutomationen({ service }: { service: Service }) {
 export function ChapterBackoffice({ service }: { service: Service }) {
   return (
     <Section id={service.slug}>
-      <Hairline anchor={`chapter-${service.slug}`} />
-      <ChapterLabel service={service} className="mt-8" />
-      <Grid className="mt-20 lg:mt-28">
+      <ChapterHead service={service} />
+      <Grid className="mt-24 lg:mt-32">
         <div className="col-span-12 lg:col-span-5">
-          <h2 className="display-h2" data-line-gap>
+          <h2 className="display-h2" data-line-gap data-line-icon-headline={`chapter-${service.slug}`}>
             {service.headline}
           </h2>
           <p className="body-text-lg mt-8">{service.text}</p>
@@ -96,10 +120,9 @@ export function ChapterBackoffice({ service }: { service: Service }) {
 export function ChapterSchulung({ service }: { service: Service }) {
   return (
     <Section id={service.slug}>
-      <Hairline anchor={`chapter-${service.slug}`} />
-      <div className="mx-auto mt-8 flex max-w-[40rem] flex-col items-center text-center">
-        <ChapterLabel service={service} />
-        <h2 className="display-h2 mt-20 lg:mt-28" data-line-gap>
+      <ChapterHead service={service} centered />
+      <div className="mx-auto mt-24 flex max-w-[40rem] flex-col items-center text-center lg:mt-32">
+        <h2 className="display-h2" data-line-gap data-line-icon-headline={`chapter-${service.slug}`}>
           {service.headline}
         </h2>
         <p className="body-text-lg mt-8">{service.text}</p>

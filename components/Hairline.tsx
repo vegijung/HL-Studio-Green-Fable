@@ -16,6 +16,7 @@ export function Hairline({
   pin,
   pinTarget,
   pinAt,
+  rideTop,
 }: {
   tone?: "fog" | "ivory" | "forest";
   className?: string;
@@ -32,6 +33,8 @@ export function Hairline({
   pinTarget?: string;
   /** viewport height fraction at which the anchor sits when the pin starts (default: the ride top) */
   pinAt?: number;
+  /** viewport height fraction where the line stops riding this anchor (default 0.22) */
+  rideTop?: number;
 }) {
   return (
     <div
@@ -44,6 +47,7 @@ export function Hairline({
       data-line-pin={anchor ? pin : undefined}
       data-line-pin-target={anchor ? pinTarget : undefined}
       data-line-pin-at={anchor && pinAt !== undefined ? pinAt : undefined}
+      data-line-ride-top={anchor && rideTop !== undefined ? rideTop : undefined}
       className={cx(
         "h-px w-full",
         tone === "fog" && "bg-fog",
