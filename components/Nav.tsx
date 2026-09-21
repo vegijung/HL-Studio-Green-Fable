@@ -7,8 +7,10 @@ import { cx } from "@/lib/cx";
 import type { Link as NavLink } from "@/content/types";
 
 /**
- * Fixed nav. Transparent with ivory text while the hero (data-nav-sentinel)
- * is under it, ivory with a fog hairline afterwards and on subpages.
+ * Fixed nav. Transparent while the hero (data-nav-sentinel) is under it,
+ * ivory with a fog hairline afterwards and on subpages. Over the hero the text
+ * is charcoal because the photograph's sky is pale at the top; phase 3 switches
+ * it to ivory for the dark opening before the photo fades in.
  */
 export function Nav({
   logo,
@@ -45,7 +47,7 @@ export function Nav({
       className={cx(
         "fixed inset-x-0 top-0 z-30 h-nav transition-colors duration-300",
         overHero
-          ? "border-b border-transparent text-ivory"
+          ? "border-b border-transparent text-charcoal"
           : "border-b border-fog bg-ivory text-charcoal",
       )}
     >

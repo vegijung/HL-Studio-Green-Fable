@@ -1,11 +1,15 @@
+import Image from "next/image";
 import { Container, Grid } from "@/components/Container";
 import { Cta } from "@/components/Cta";
 import { Lines } from "@/components/Lines";
+import { HeroRidgeDebug } from "@/components/sections/HeroRidgeDebug";
+import ridge from "@/content/ridge.json";
 import type { SiteContent } from "@/content/types";
 
 /**
  * Sections 0 and 1: opening and hero on the dark surface.
- * Phase 1: a grey placeholder block stands in for the mountain photograph.
+ * The photograph covers the section; its ridge is in content/ridge.json and the
+ * line locks onto it in phase 3 through the cover math in lib/ridge.ts.
  */
 export function Hero({ content }: { content: SiteContent["hero"] }) {
   return (
@@ -15,8 +19,19 @@ export function Hero({ content }: { content: SiteContent["hero"] }) {
       data-tone="dark"
       className="relative flex min-h-svh flex-col justify-end bg-charcoal text-ivory"
     >
-      {/* placeholder for the hero image, replaced in phase 2 */}
-      <div aria-hidden className="absolute inset-0 z-0 bg-[#2a2c2a]" />
+      <div aria-hidden className="absolute inset-0 z-0 overflow-hidden">
+        <Image
+          src={`/hero/${ridge.source}`}
+          alt=""
+          fill
+          preload
+          fetchPriority="high"
+          sizes="100vw"
+          className="object-cover object-center"
+          data-hero-image
+        />
+      </div>
+      <HeroRidgeDebug />
 
       <Container className="pb-24 pt-40 lg:pb-28">
         <Grid>
