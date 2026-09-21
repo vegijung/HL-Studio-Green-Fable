@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { cx } from "@/lib/cx";
 
 /**
@@ -8,12 +8,14 @@ import { cx } from "@/lib/cx";
 export function Container({
   children,
   className,
+  style,
 }: {
   children: ReactNode;
   className?: string;
+  style?: CSSProperties;
 }) {
   return (
-    <div className="relative z-20 px-6 lg:px-12">
+    <div className="relative z-20 px-6 lg:px-12" style={style}>
       <div className={cx("mx-auto w-full max-w-content", className)}>
         {children}
       </div>

@@ -42,8 +42,8 @@ export function Hero({ content }: { content: SiteContent["hero"] }) {
       </div>
       <HeroRidgeDebug />
 
-      {/* the copy starts below 36% of the viewport so the ridge never runs behind it at rest */}
-      <Container className="mt-[36svh] pb-12">
+      {/* the copy starts below the ridge: 36% of the viewport, or lower if the engine measures the ridge lower on the left */}
+      <Container className="pb-12" style={{ marginTop: "max(36svh, var(--ridge-clear, 0px))" }}>
         <div data-hero-content data-line-gap-group>
           <Grid>
             <div className="col-span-12 lg:col-span-8">

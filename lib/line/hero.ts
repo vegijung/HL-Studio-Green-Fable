@@ -30,10 +30,10 @@ export function setupHero(engine: LineEngine, hero: HTMLElement): () => void {
       set("--photo-out", 1 - p);
       set("--hero-scale", 1 - 0.035 * p);
       // the copy goes first, so the line drifting down through it meets no text
-      set("--content-out", 1 - clamp(p * 2.5));
+      set("--content-out", 1 - clamp(p * 4));
       set("--surface-mix", p);
       engine.heroFade = p;
-      for (const c of contents) c.toggleAttribute("data-line-gap-off", p > 0.3);
+      for (const c of contents) c.toggleAttribute("data-line-gap-off", p > 0.1);
     },
   });
 

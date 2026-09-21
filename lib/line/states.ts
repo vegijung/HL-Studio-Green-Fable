@@ -53,7 +53,7 @@ export function ridgeState(
   const t = coverTransform(ridge.width, ridge.height, boxW, boxH);
   const px: Pt[] = ridge.points.map((p) => projectPoint(p, t));
   const clipped = clipPolylineX(px, X_MIN * vw, X_MAX * vw);
-  const pts = resampleByArcLength(clipped, N);
+  const pts = snapToVertices(resampleByArcLength(clipped, N), clipped);
   let mean = 0;
   for (const p of pts) mean += p[1];
   mean /= pts.length;
@@ -63,6 +63,35 @@ export function ridgeState(
     state.dy[i] = (pts[i][1] - mean) / vh;
   }
   return { state, baseline: mean / vh };
+}
+
+/**
+ * Moves the resampled point nearest to each source vertex onto that vertex, so
+ * every peak and saddle of the ridge is hit exactly instead of being cut by
+ * the sample spacing. Points stay in order; spacing changes by half a step at most.
+ */
+function snapToVertices(samples: Pt[], vertices: Pt[]): Pt[] {
+  const out = samples.map((p) => [p[0], p[1]] as Pt);
+  const taken = new Set<number>();
+  let from = 0;
+  for (const v of vertices) {
+    let best = -1;
+    let bestD = Infinity;
+    for (let i = from; i < out.length; i++) {
+      const d = Math.hypot(out[i][0] - v[0], out[i][1] - v[1]);
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+      if (out[i][0] > v[0] + 40) break;
+    }
+    if (best >= 0 && !taken.has(best)) {
+      out[best] = [v[0], v[1]];
+      taken.add(best);
+      from = best;
+    }
+  }
+  return out;
 }
 
 /** horizontally stretches a state around cx (facts ridge: 1.3x) */

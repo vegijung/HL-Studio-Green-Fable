@@ -65,19 +65,22 @@ const f1 = (v: number) => (Math.round(v * 10) / 10).toString();
 
 /**
  * Catmull-Rom spline through the points, emitted as cubic Béziers.
- * Uniform parametrisation is fine because the points are evenly spaced by arc length.
+ * Uniform parametrisation is fine because the points are evenly spaced by arc
+ * length. `tension` pulls the control points toward the vertices (0 = classic
+ * Catmull-Rom, 1 = straight segments); a little keeps sharp peaks sharp.
  */
-export function catmullRomPath(xs: ArrayLike<number>, ys: ArrayLike<number>): string {
+export function catmullRomPath(xs: ArrayLike<number>, ys: ArrayLike<number>, tension = 0.4): string {
   const n = xs.length;
   if (n < 2) return "";
+  const k = (1 - tension) / 6;
   let d = `M${f1(xs[0])} ${f1(ys[0])}`;
   for (let i = 0; i < n - 1; i++) {
     const i0 = Math.max(i - 1, 0);
     const i3 = Math.min(i + 2, n - 1);
-    const c1x = xs[i] + (xs[i + 1] - xs[i0]) / 6;
-    const c1y = ys[i] + (ys[i + 1] - ys[i0]) / 6;
-    const c2x = xs[i + 1] - (xs[i3] - xs[i]) / 6;
-    const c2y = ys[i + 1] - (ys[i3] - ys[i]) / 6;
+    const c1x = xs[i] + (xs[i + 1] - xs[i0]) * k;
+    const c1y = ys[i] + (ys[i + 1] - ys[i0]) * k;
+    const c2x = xs[i + 1] - (xs[i3] - xs[i]) * k;
+    const c2y = ys[i + 1] - (ys[i3] - ys[i]) * k;
     d += `C${f1(c1x)} ${f1(c1y)} ${f1(c2x)} ${f1(c2y)} ${f1(xs[i + 1])} ${f1(ys[i + 1])}`;
   }
   return d;

@@ -165,11 +165,11 @@ export function FactsRidge({ facts }: { facts: Fact[] }) {
               className="absolute w-px bg-fog"
               style={{ left: spot.x, bottom: spot.bottom, height: LEADER }}
             />
+            {/* no data-line-gap here on purpose: the line passes behind these labels uncut */}
             <div
               ref={(node) => {
                 labelRefs.current[i] = node;
               }}
-              data-line-gap
               className="absolute w-max max-w-[17ch] text-center"
               style={{
                 left: lefts ? lefts[i] : spot.x,

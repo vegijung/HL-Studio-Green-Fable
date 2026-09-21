@@ -80,6 +80,21 @@ for (let x = 0; x < W; x++) {
       run = 0;
     }
   }
+
+  // refine to the perceived edge: the row halfway between the sky just above
+  // and the rock just below, which matters on soft, hazy edges
+  if (found < H - 1) {
+    const r = Math.max(1, Math.round(6 * scale));
+    const above = median(column.slice(Math.max(0, found - 3 * r), Math.max(1, found - r)));
+    const below = median(column.slice(Math.min(H - 1, found + r), Math.min(H, found + 3 * r)));
+    const mid = (above + below) / 2;
+    for (let y = Math.max(0, found - r); y <= Math.min(H - 1, found + 2 * r); y++) {
+      if (column[y] <= mid) {
+        found = y;
+        break;
+      }
+    }
+  }
   raw[x] = found;
 }
 

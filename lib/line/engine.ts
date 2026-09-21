@@ -146,10 +146,26 @@ export class LineEngine {
     ScrollTrigger.refresh();
     this.rendered = window.scrollY;
     gsap.ticker.add(this.tick);
+
+    // the hero box is the ridge's reference frame; when its size settles (fonts, clearance), re-measure
+    const hero = document.getElementById("hero");
+    if (hero && "ResizeObserver" in window) {
+      let lastH = hero.offsetHeight;
+      this.heroObserver = new ResizeObserver(() => {
+        if (hero.offsetHeight !== lastH) {
+          lastH = hero.offsetHeight;
+          ScrollTrigger.refresh();
+        }
+      });
+      this.heroObserver.observe(hero);
+    }
   }
+
+  private heroObserver: ResizeObserver | null = null;
 
   destroy() {
     gsap.ticker.remove(this.tick);
+    this.heroObserver?.disconnect();
     ScrollTrigger.removeEventListener("refresh", this.onRefresh);
     for (const n of this.nodes) {
       n.ride?.kill();
@@ -267,6 +283,16 @@ export class LineEngine {
     this.states.ridge = state;
     this.states["ridge-facts"] = stretchState(state, 1.3);
     this.states.straight = straightState();
+
+    // the hero copy must start below the ridge's lowest point on the left, whatever the crop
+    if (hero) {
+      let low = -Infinity;
+      for (let i = 0; i < N; i++) {
+        if (state.x[i] >= 0.03 && state.x[i] <= 0.32) low = Math.max(low, state.dy[i]);
+      }
+      const clear = Number.isFinite(low) ? (baseline + low) * this.vh + 30 : 0;
+      hero.style.setProperty("--ridge-clear", `${Math.round(clear)}px`);
+    }
 
     for (const n of this.nodes) {
       if (!n.el) {
@@ -433,7 +459,9 @@ export class LineEngine {
           tops.set(n, top);
         }
         const lineY = (y + this.dyAt(f.x)) * this.vh;
-        offset = lineY - (top + f.dy * this.vh);
+        // ramp the grip in over a short scroll distance so the line's lag does not arrive as a jump
+        const grip = easeInOutQuad(clamp((s - n.start) / (0.15 * this.vh)));
+        offset = (lineY - (top + f.dy * this.vh)) * grip;
       } else {
         offset = -f.dy * this.vh;
       }
