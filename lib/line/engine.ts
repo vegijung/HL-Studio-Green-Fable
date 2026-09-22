@@ -37,7 +37,7 @@ import {
   type Rect,
 } from "./states";
 import { coverTransform } from "@/lib/ridge";
-import { ICONS, iconState, segmentState, type IconName } from "./icons";
+import { ICONS, ICON_FOR_SERVICE, iconState, segmentState, type IconName } from "./icons";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -80,12 +80,14 @@ type StageStepKind = IconName | "photo" | "segment";
  * grows into the closing.
  */
 const STAGE_PROGRAMME: Array<{ section: string; step: StageStepKind; offsetVh?: number }> = [
-  { section: "websites", step: "browser" },
-  { section: "automationen", step: "loops" },
-  { section: "backoffice", step: "sheet" },
-  { section: "beratung-schulung", step: "bubble" },
+  { section: "websites", step: ICON_FOR_SERVICE.websites },
+  { section: "automationen", step: ICON_FOR_SERVICE.automationen },
+  { section: "backoffice", step: ICON_FOR_SERVICE.backoffice },
+  { section: "beratung-schulung", step: ICON_FOR_SERVICE["beratung-schulung"] },
   { section: "cases", step: "photo" },
 ];
+/** how fast the hover pulls the thread into an icon and lets it go (fraction of the remaining way per frame) */
+const HOVER_RATE = 0.14;
 
 const IVORY = [247, 245, 239];
 const FOREST = [46, 75, 63];
@@ -189,6 +191,12 @@ export class LineEngine {
   private stageSegment = emptyState();
   private stageSteps: StageStep[] = [];
   private stageEnd = 0;
+  /** the hover on the services overview: the icon shapes, which one is wanted, which one is shown, and how far it has formed */
+  private stageIconShapes: Partial<Record<IconName, LineState>> = {};
+  private hoverTarget: IconName | null = null;
+  private hoverIcon: IconName | null = null;
+  private hoverMix = 0;
+  private hoverCleanup: Array<() => void> = [];
   /** the stage's photo window: the fixed frame, the image box inside it and its rect */
   private stagePhotoEl: HTMLElement | null = null;
   private stagePhotoImg: HTMLElement | null = null;
@@ -256,6 +264,8 @@ export class LineEngine {
       n.pin?.kill();
     }
     for (const s of this.sections) s.st.kill();
+    for (const off of this.hoverCleanup) off();
+    this.hoverCleanup = [];
     this.nodes = [];
     this.sections = [];
     delete document.documentElement.dataset.line;
@@ -372,6 +382,28 @@ export class LineEngine {
       );
     }
 
+    // hovering (or focusing) a service name on the overview pulls the waiting thread into its icon
+    for (const el of Array.from(document.querySelectorAll<HTMLElement>("[data-line-hover-icon]"))) {
+      const icon = el.dataset.lineHoverIcon as IconName;
+      if (!(icon in ICONS)) continue;
+      const on = () => {
+        this.hoverTarget = icon;
+      };
+      const off = () => {
+        if (this.hoverTarget === icon) this.hoverTarget = null;
+      };
+      el.addEventListener("pointerenter", on);
+      el.addEventListener("pointerleave", off);
+      el.addEventListener("focus", on);
+      el.addEventListener("blur", off);
+      this.hoverCleanup.push(() => {
+        el.removeEventListener("pointerenter", on);
+        el.removeEventListener("pointerleave", off);
+        el.removeEventListener("focus", on);
+        el.removeEventListener("blur", off);
+      });
+    }
+
     this.sections = Array.from(document.querySelectorAll<HTMLElement>("[data-tone]")).map((el) => ({
       el,
       st: ScrollTrigger.create({ trigger: el, start: "top top", end: "bottom top" }),
@@ -464,6 +496,10 @@ export class LineEngine {
         h: ICON_SIZE / this.vh,
       };
       this.stageSegment = segmentState(iconBox, this.vw, this.vh, x0, x1);
+      this.stageIconShapes = {};
+      for (const name of Object.keys(ICONS) as IconName[]) {
+        this.stageIconShapes[name] = iconState(ICONS[name], iconBox, this.vw, this.vh, x0, x1);
+      }
       if (this.stagePhotoEl) {
         const w = this.stagePhotoEl.getBoundingClientRect();
         this.stageWindow = { left: w.left, top: w.top, width: w.width, height: w.height };
@@ -569,10 +605,34 @@ export class LineEngine {
     return prev ? prev.pan[1] : PHOTO_PAN[0];
   }
 
+  /**
+   * Moves the hover along: the thread forms the wanted icon, and lets go of
+   * one before taking another. Returns whether anything is still moving.
+   */
+  private updateHover(): boolean {
+    if (this.hoverIcon !== this.hoverTarget && this.hoverMix <= 0.001) {
+      this.hoverIcon = this.hoverTarget;
+      this.hoverMix = 0;
+    }
+    const target = this.hoverTarget && this.hoverTarget === this.hoverIcon ? 1 : 0;
+    const d = target - this.hoverMix;
+    if (Math.abs(d) < 0.001) {
+      this.hoverMix = target;
+      return false;
+    }
+    this.hoverMix += d * HOVER_RATE;
+    return true;
+  }
+
   /** the stage's shape at scroll s: segment or icon, the morph between two steps, or the panning photo ridge */
   private stageShape(s: number, out: LineState): LineState {
     const { k, p } = this.stageAt(s);
-    if (k < 0) return copyState(this.stageSegment, out);
+    if (k < 0) {
+      // while the thread waits on the stage, a hovered service name pulls it into that icon
+      const hovered = this.hoverIcon && this.stageIconShapes[this.hoverIcon];
+      if (hovered && this.hoverMix > 0) return morphInto(out, this.stageSegment, hovered, easeInOutQuad(this.hoverMix), "thread");
+      return copyState(this.stageSegment, out);
+    }
     const step = this.stageSteps[k];
     const from = this.stepShapeEnd(k - 1);
     if (step.kind === "photo" && p >= 1) return this.stagePhotoState(this.stageFocus(s), out);
@@ -619,7 +679,7 @@ export class LineEngine {
    */
   private stageOpacity(s: number): number {
     const { k, p } = this.stageAt(s);
-    if (k < 0) return STAGE_OPACITY_BEFORE;
+    if (k < 0) return lerp(STAGE_OPACITY_BEFORE, 1, this.hoverMix);
     const step = this.stageSteps[k];
     if (step.kind === "photo" && p >= 1) {
       const holdStart = step.docTop - STAGE_MORPH_TO * this.vh;
@@ -732,8 +792,9 @@ export class LineEngine {
       }
     }
 
-    // render() clears `dirty` itself once the colour has converged
-    if (this.rendered !== this.lastRendered || this.dirty) {
+    // render() clears `dirty` itself once the colour has converged; a moving hover renders too
+    const hovering = this.updateHover();
+    if (this.rendered !== this.lastRendered || this.dirty || hovering) {
       this.render(this.rendered);
       this.lastRendered = this.rendered;
     }

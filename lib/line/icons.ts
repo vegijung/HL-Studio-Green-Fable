@@ -161,6 +161,14 @@ const bubble: Pt[] = (() => {
 })();
 export const ICONS: Record<IconName, Pt[]> = { browser, loops, sheet, bubble };
 
+/** the icon each service (by slug and section id) is drawn with */
+export const ICON_FOR_SERVICE: Record<string, IconName> = {
+  websites: "browser",
+  automationen: "loops",
+  backoffice: "sheet",
+  "beratung-schulung": "bubble",
+};
+
 /**
  * Moves the sample nearest (by arc length) to each vertex of the source
  * polyline onto that vertex, so corners and stroke reversals are hit exactly

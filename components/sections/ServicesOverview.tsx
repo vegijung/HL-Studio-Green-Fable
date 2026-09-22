@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { Hairline } from "@/components/Hairline";
+import { ICON_FOR_SERVICE } from "@/lib/line/icons";
 import { Section, SectionHead } from "@/components/Section";
 import type { SiteContent } from "@/content/types";
 
 /**
  * Section 5: label, H2, text and the four service names as large serif words.
- * Content stays in the left two thirds; the line's stage sits to the right.
+ * Content stays in the left two thirds; the line's stage sits to the right, and
+ * hovering a name pulls the thread there into that service's icon.
  */
 export function ServicesOverview({ content }: { content: SiteContent["services"] }) {
   return (
@@ -18,6 +20,7 @@ export function ServicesOverview({ content }: { content: SiteContent["services"]
             <li key={service.slug}>
               <Link
                 href={`#${service.slug}`}
+                data-line-hover-icon={ICON_FOR_SERVICE[service.slug]}
                 className="group block transition-opacity duration-200 hover:opacity-60"
               >
                 <span className="label block text-charcoal/60">{service.index}</span>
