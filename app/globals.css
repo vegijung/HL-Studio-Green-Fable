@@ -82,6 +82,11 @@
 /* ---- line engine hooks ------------------------------------------------- */
 
 /* the engine replaces the static hairlines on desktop; they keep their space */
+/* the closing photograph in the flow shows only once the stage window has grown into it */
+html[data-line="on"] [data-photo-box] {
+  opacity: var(--photo-show, 0);
+}
+
 html[data-line="on"] [data-line-placeholder] {
   visibility: hidden;
 }

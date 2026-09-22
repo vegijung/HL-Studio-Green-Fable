@@ -41,14 +41,17 @@ export interface CoverTransform {
 }
 
 /**
- * Same math the browser uses for object-fit: cover with object-position 50% 50%:
- * scale so the image covers the box, then centre the overflow.
+ * Same math the browser uses for object-fit: cover with object-position
+ * `posX posY` (fractions, default 50% 50%): scale so the image covers the box,
+ * then place the overflow according to the position.
  */
 export function coverTransform(
   imageWidth: number,
   imageHeight: number,
   boxWidth: number,
   boxHeight: number,
+  posX = 0.5,
+  posY = 0.5,
 ): CoverTransform {
   const scale = Math.max(boxWidth / imageWidth, boxHeight / imageHeight);
   const drawWidth = imageWidth * scale;
@@ -56,8 +59,8 @@ export function coverTransform(
   return {
     drawWidth,
     drawHeight,
-    offsetX: (boxWidth - drawWidth) / 2,
-    offsetY: (boxHeight - drawHeight) / 2,
+    offsetX: (boxWidth - drawWidth) * posX,
+    offsetY: (boxHeight - drawHeight) * posY,
   };
 }
 

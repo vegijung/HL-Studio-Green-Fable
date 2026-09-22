@@ -65,6 +65,54 @@ export function ridgeState(
   return { state, baseline: mean / vh };
 }
 
+/** a rectangle in viewport pixels */
+export interface Rect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * The photographed ridge as it appears in a photo drawn with object-fit: cover
+ * (object-position `focus`) inside `rect`, in viewport units. The line ends
+ * exactly at the rect's sides, so it never leaves the picture while the rect
+ * grows. Returns the state (dy relative to the mean ridge y) and that mean in
+ * viewport pixels.
+ */
+export function ridgeInRect(
+  ridge: RidgeData,
+  rect: Rect,
+  focus: number,
+  vw: number,
+  vh: number,
+): { state: LineState; baselineY: number } {
+  const t = coverTransform(ridge.width, ridge.height, rect.width, rect.height, focus, 0.5);
+  const px: Pt[] = ridge.points.map((p) => {
+    const [x, y] = projectPoint(p, t);
+    return [rect.left + x, rect.top + y];
+  });
+  const clipped = clipPolylineX(px, rect.left, rect.left + rect.width);
+  const pts = snapToVertices(resampleByArcLength(clipped, N), clipped);
+  let mean = 0;
+  for (const p of pts) mean += p[1];
+  mean /= pts.length;
+  const state = emptyState();
+  for (let i = 0; i < N; i++) {
+    state.x[i] = pts[i][0] / vw;
+    state.dy[i] = (pts[i][1] - mean) / vh;
+  }
+  return { state, baselineY: mean };
+}
+
+/** shifts a state's dy so it is relative to another baseline (both in viewport fractions) */
+export function rebase(s: LineState, fromY: number, toY: number): LineState {
+  const out = copyState(s);
+  const d = fromY - toY;
+  for (let i = 0; i < N; i++) out.dy[i] = s.dy[i] + d;
+  return out;
+}
+
 /**
  * Moves the resampled point nearest to each source vertex onto that vertex, so
  * every peak and saddle of the ridge is hit exactly instead of being cut by

@@ -1,14 +1,17 @@
+import Image from "next/image";
 import { Container, Grid } from "@/components/Container";
 import { Cta } from "@/components/Cta";
 import { Footer } from "@/components/Footer";
-import { Hairline } from "@/components/Hairline";
+import ridge from "@/content/ridge.json";
 import { channelHref, channelValue, secondaryChannels } from "@/lib/contact";
 import type { SiteContent } from "@/content/types";
 
 /**
- * Section 13 plus footer: the dark closing. Contact and footer together fill
- * one viewport so the page ends in the light it began in. The ridge anchor
- * sits at 30% of the block, the closing statement below it.
+ * Section 13 plus footer: the closing. The page ends where it began: the
+ * photograph fills a viewport again and the line is the whole ridge on it,
+ * the closing statement below the ridge. On desktop the engine grows its
+ * stage window into this box (`data-line-photo`) and only then shows the
+ * picture in the flow (`--photo-show`); without the engine it is simply there.
  */
 export function Contact({
   content,
@@ -18,12 +21,21 @@ export function Contact({
   footer: SiteContent["footer"];
 }) {
   return (
-    <div data-tone="dark" className="flex min-h-svh flex-col bg-night text-ivory">
-      <section id="kontakt" className="relative flex flex-1 flex-col">
-        <Container className="pt-[28svh]">
-          <Hairline anchor="contact" shape="ridge" tone="ivory" />
+    <div data-tone="dark" className="bg-night text-ivory">
+      <section id="kontakt" data-line-photo className="relative flex min-h-svh flex-col justify-end overflow-hidden">
+        <div aria-hidden data-photo-box className="absolute inset-0 z-0 overflow-hidden">
+          <Image
+            src={`/hero/${ridge.source}`}
+            alt=""
+            fill
+            sizes="100vw"
+            className="object-cover object-center"
+          />
+        </div>
 
-          <Grid className="mt-[13svh] pb-10">
+        {/* the copy starts below the ridge: 44% of the viewport, or lower if the engine measures the ridge lower on the left */}
+        <Container className="relative z-20 pb-16" style={{ marginTop: "max(44svh, var(--ridge-clear, 0px))" }}>
+          <Grid>
             <div className="col-span-12 lg:col-span-9">
               <p className="display-statement" data-line-gap>
                 {content.statement}

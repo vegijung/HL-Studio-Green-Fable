@@ -8,7 +8,11 @@
  *            while it crosses the middle band of the viewport (facts, contact)
  *   stage    a fixed spot on the right of the viewport where the thread sits as
  *            a short segment and is pulled into one icon after another as the
- *            chapters pass (the middle of the page)
+ *            chapters pass (the middle of the page); after the last icon the
+ *            photograph returns in a window there and the thread takes the
+ *            ridge of that crop
+ *   photo    a full-width photograph in the flow (the closing): the stage
+ *            window grows into it and the line becomes the whole ridge again
  *
  * Between nodes the shape morphs with a per-point delay (thread feel) and the
  * baseline blends. The rendered scroll position lerps toward the real one
@@ -23,12 +27,16 @@ import {
   copyState,
   emptyState,
   morphInto,
+  rebase,
+  ridgeInRect,
   ridgeState,
   straightState,
   stretchState,
   type LineState,
   type MorphMode,
+  type Rect,
 } from "./states";
+import { coverTransform } from "@/lib/ridge";
 import { ICONS, iconState, segmentState, type IconName } from "./icons";
 
 gsap.registerPlugin(ScrollTrigger);
@@ -55,9 +63,11 @@ const STAGE_MORPH_TO = 0.34;
 const STAGE_SETTLE = 0.4;
 /** stage icon size in px */
 const ICON_SIZE = 200;
-/** stage opacity before the chapters, during them, and after them */
-const STAGE_OPACITY = [0.6, 1, 0.4];
-/** the stage's icons in chapter order, and the section ids whose top starts the morph into each one */
+/** stage opacity before the chapters, during them, and on the photograph after them */
+const STAGE_OPACITY = [0.6, 1, 1];
+/** the stage window grows into the full photograph over this much scrolling (in vh) */
+const GROW_VH = 0.55;
+/** the stage's icons in chapter order, and the section ids whose top starts the morph into each one; `null` brings the photograph back */
 const STAGE_PROGRAMME: Array<{ section: string; icon: IconName | null }> = [
   { section: "websites", icon: "browser" },
   { section: "automationen", icon: "loops" },
@@ -70,8 +80,10 @@ const IVORY = [247, 245, 239];
 const FOREST = [46, 75, 63];
 
 interface Node {
-  kind: "hero" | "anchor" | "stage";
+  kind: "hero" | "anchor" | "stage" | "photo";
   el: HTMLElement | null;
+  /** a photo node's own ridge (dy relative to docY) */
+  state: LineState | null;
   shape: ShapeName;
   opacity: number;
   transition: MorphMode;
@@ -158,6 +170,16 @@ export class LineEngine {
   private stageEl: HTMLElement | null = null;
   private stageSegment = emptyState();
   private stageSteps: StageStep[] = [];
+  /** the stage's photo window: the fixed frame, the image box inside it, its rect and focus (object-position x) */
+  private stagePhotoEl: HTMLElement | null = null;
+  private stagePhotoImg: HTMLElement | null = null;
+  private stageWindow: Rect = { left: 0, top: 0, width: 1, height: 1 };
+  private photoFocus = 0.5;
+  /** how far the photograph is present under the line this frame (0..1); drives the window and the colour */
+  private photoAlpha = 0;
+  /** the window this frame: null while hidden, "handover" once the photo in the flow has taken over */
+  private windowFrame: { rect: Rect; focus: number; alpha: number } | "handover" | null = null;
+  private lastWindowKey = "";
 
   private vw = 0;
   private vh = 0;
@@ -225,6 +247,7 @@ export class LineEngine {
   private newNode(partial: Partial<Node> & Pick<Node, "kind">): Node {
     return {
       el: null,
+      state: null,
       shape: "straight",
       opacity: 1,
       transition: "ltr",
@@ -250,6 +273,8 @@ export class LineEngine {
   private yAt(n: Node, s: number): number {
     if (n.kind === "hero") return n.fixedY - s / this.vh;
     if (n.kind === "stage") return n.fixedY;
+    // the closing photograph moves in the flow; the line stays on it without inertia so the handover from the window is seamless
+    if (n.kind === "photo") return (n.docY - window.scrollY) / this.vh;
     const shift = n.pin ? clamp(s - n.pinStart, 0, n.pinLen) : 0;
     return (n.docY - s + shift) / this.vh;
   }
@@ -316,6 +341,20 @@ export class LineEngine {
     }
     if (!stageInserted && this.stageEl) this.nodes.push(this.newNode({ kind: "stage", el: this.stageEl }));
 
+    this.stagePhotoEl = document.querySelector<HTMLElement>("[data-line-stage-photo]");
+    this.stagePhotoImg = this.stagePhotoEl?.firstElementChild as HTMLElement | null;
+    this.photoFocus = this.stagePhotoEl?.dataset.lineStagePhotoFocus ? Number(this.stagePhotoEl.dataset.lineStagePhotoFocus) : 0.5;
+    const photoEl = document.querySelector<HTMLElement>("[data-line-photo]");
+    if (photoEl) {
+      this.nodes.push(
+        this.newNode({
+          kind: "photo",
+          el: photoEl,
+          ride: ScrollTrigger.create({ trigger: photoEl, start: "top top" }),
+        }),
+      );
+    }
+
     this.sections = Array.from(document.querySelectorAll<HTMLElement>("[data-tone]")).map((el) => ({
       el,
       st: ScrollTrigger.create({ trigger: el, start: "top top", end: "bottom top" }),
@@ -354,14 +393,7 @@ export class LineEngine {
     this.states.straight = straightState();
 
     // the hero copy must start below the ridge's lowest point on the left, whatever the crop
-    if (hero) {
-      let low = -Infinity;
-      for (let i = 0; i < N; i++) {
-        if (state.x[i] >= 0.03 && state.x[i] <= 0.32) low = Math.max(low, state.dy[i]);
-      }
-      const clear = Number.isFinite(low) ? (baseline + low) * this.vh + 30 : 0;
-      hero.style.setProperty("--ridge-clear", `${Math.round(clear)}px`);
-    }
+    if (hero) this.setRidgeClear(hero, state, baseline * this.vh);
 
     for (const s of this.sections) {
       // ScrollTrigger clamps `end` to the maximum scroll, so take the height from the element
@@ -388,6 +420,17 @@ export class LineEngine {
           n.holdEnd = n.pinStart + n.pinLen + Math.max(0, n.pinAt - n.release) * this.vh;
         }
       }
+      if (n.kind === "photo" && n.el && n.ride) {
+        // the full-width photograph: its own ridge, held from the moment its top reaches the viewport top
+        const docTop = n.ride.start;
+        const box = { left: 0, top: 0, width: this.vw, height: n.el.offsetHeight };
+        const r = ridgeInRect(this.ridge, box, 0.5, this.vw, this.vh);
+        n.state = r.state;
+        n.docY = docTop + r.baselineY;
+        n.start = docTop;
+        n.end = Number.MAX_SAFE_INTEGER;
+        this.setRidgeClear(n.el, r.state, r.baselineY);
+      }
     }
 
     // the stage: a fixed box on the right; holds from the first stage section to just before the next anchor
@@ -403,12 +446,18 @@ export class LineEngine {
         h: ICON_SIZE / this.vh,
       };
       this.stageSegment = segmentState(iconBox, this.vw, this.vh, x0, x1);
+      // the photo window: the ridge of the crop it shows, relative to the stage baseline
+      let photoShape = copyState(this.stageSegment);
+      if (this.stagePhotoEl) {
+        const w = this.stagePhotoEl.getBoundingClientRect();
+        this.stageWindow = { left: w.left, top: w.top, width: w.width, height: w.height };
+        const r = ridgeInRect(this.ridge, this.stageWindow, this.photoFocus, this.vw, this.vh);
+        photoShape = rebase(r.state, r.baselineY / this.vh, stage.fixedY);
+      }
       this.stageSteps = STAGE_PROGRAMME.flatMap((step) => {
         const docTop = sectionTop(step.section);
         if (docTop === null) return [];
-        const shape = step.icon
-          ? iconState(ICONS[step.icon], iconBox, this.vw, this.vh, x0, x1)
-          : copyState(this.stageSegment);
+        const shape = step.icon ? iconState(ICONS[step.icon], iconBox, this.vw, this.vh, x0, x1) : photoShape;
         return [{ docTop, shape }];
       });
       const stageIndex = this.nodes.indexOf(stage);
@@ -416,7 +465,7 @@ export class LineEngine {
       const firstSection = sectionTop(this.stageEl.dataset.lineStageFrom || "leistungen");
       stage.start = (firstSection ?? first?.docTop ?? 0) - 0.55 * this.vh;
       const after = this.nodes[stageIndex + 1];
-      stage.end = after ? after.start - 0.6 * this.vh : Number.MAX_SAFE_INTEGER;
+      stage.end = after ? after.start - (after.kind === "photo" ? GROW_VH : 0.6) * this.vh : Number.MAX_SAFE_INTEGER;
       if (stage.end < stage.start) stage.end = stage.start;
     }
 
@@ -437,7 +486,18 @@ export class LineEngine {
     this.pathLength = 0;
     this.lastRendered = -1;
     this.lastMaskScroll = -1;
+    this.lastWindowKey = "";
     this.dirty = true;
+  }
+
+  /** copy on a photograph must start below the ridge's lowest point on the left, whatever the crop */
+  private setRidgeClear(el: HTMLElement, state: LineState, baselineY: number) {
+    let low = -Infinity;
+    for (let i = 0; i < N; i++) {
+      if (state.x[i] >= 0.03 && state.x[i] <= 0.32) low = Math.max(low, state.dy[i]);
+    }
+    const clear = Number.isFinite(low) ? baselineY + low * this.vh + 30 : 0;
+    el.style.setProperty("--ridge-clear", `${Math.round(clear)}px`);
   }
 
   /** the stage's shape at scroll s: segment or icon, or the morph between two steps */
@@ -470,6 +530,15 @@ export class LineEngine {
     return morphInto(out, seg, to, (p - STAGE_SETTLE) / (1 - STAGE_SETTLE), "thread");
   }
 
+  /** how far the photograph has come back into the stage window at scroll s (the rise of the last step) */
+  private stagePhotoAlpha(s: number): number {
+    const steps = this.stageSteps;
+    const last = steps.length - 1;
+    if (last < 0 || STAGE_PROGRAMME[last]?.icon !== null) return 0;
+    const p = clamp((STAGE_MORPH_FROM * this.vh - (steps[last].docTop - s)) / ((STAGE_MORPH_FROM - STAGE_MORPH_TO) * this.vh));
+    return clamp((p - STAGE_SETTLE) / (1 - STAGE_SETTLE));
+  }
+
   /** the stage's opacity: quieter before the chapters and after them */
   private stageOpacity(s: number): number {
     const steps = this.stageSteps;
@@ -482,7 +551,33 @@ export class LineEngine {
 
   private shapeOf(n: Node, s: number, out: LineState): LineState {
     if (n.kind === "stage") return this.stageShape(s, out);
+    if (n.kind === "photo" && n.state) return copyState(n.state, out);
     return copyState(this.states[n.shape], out);
+  }
+
+  /**
+   * The stage window grows into the full photograph: its frame moves from the
+   * stage rect to the photo's rect in the flow, the crop's focus drifts to the
+   * centre, and the line is the ridge of whatever the frame shows, so it
+   * stretches to the whole width as the picture does.
+   */
+  private grow(s: number, stage: Node, photo: Node): { y: number; opacity: number } {
+    const u = clamp((s - stage.end) / Math.max(1, photo.start - stage.end));
+    const e = easeInOutQuad(u);
+    const real = photo.el!.getBoundingClientRect();
+    const w0 = this.stageWindow;
+    const rect: Rect = {
+      left: lerp(w0.left, 0, e),
+      top: lerp(w0.top, real.top, e),
+      width: lerp(w0.width, this.vw, e),
+      height: lerp(w0.height, real.height, e),
+    };
+    const focus = lerp(this.photoFocus, 0.5, e);
+    const r = ridgeInRect(this.ridge, rect, focus, this.vw, this.vh);
+    copyState(r.state, this.work);
+    this.photoAlpha = 1;
+    this.windowFrame = { rect, focus, alpha: 1 };
+    return { y: r.baselineY / this.vh, opacity: 1 };
   }
 
   private opacityOf(n: Node, s: number): number {
@@ -497,12 +592,25 @@ export class LineEngine {
     const n = nodes[i];
     const next = nodes[i + 1];
 
+    this.photoAlpha = 0;
+    this.windowFrame = null;
+
     if (s <= n.end || !next) {
       this.shapeOf(n, s, this.work);
+      if (n.kind === "stage") {
+        this.photoAlpha = this.stagePhotoAlpha(s);
+        if (this.photoAlpha > 0) this.windowFrame = { rect: this.stageWindow, focus: this.photoFocus, alpha: this.photoAlpha };
+      }
+      if (n.kind === "photo") {
+        this.photoAlpha = 1;
+        this.windowFrame = "handover";
+      }
       // the last anchor keeps riding to the page end, but never up under the nav
-      const y = next ? this.yAt(n, s) : Math.max(RIDE_TOP + 0.06, this.yAt(n, s));
+      const y = next || n.kind !== "anchor" ? this.yAt(n, s) : Math.max(RIDE_TOP + 0.06, this.yAt(n, s));
       return { y, opacity: this.opacityOf(n, s) };
     }
+
+    if (n.kind === "stage" && next.kind === "photo") return this.grow(s, n, next);
 
     // a pinned anchor morphs in place during its pin (the flatten), then holds the flat shape
     if (n.pin && s <= n.holdEnd) {
@@ -562,8 +670,9 @@ export class LineEngine {
     this.path.setAttribute("d", catmullRomPath(this.xs, this.ys));
     this.path.setAttribute("stroke-opacity", opacity.toFixed(3));
     this.updateFollowers(s, y);
+    this.updateWindow();
 
-    // colour follows the surface under the line's baseline
+    // colour follows the surface under the line's baseline; on the photograph it is ivory
     const docY = y * this.vh + s;
     let tone = 1;
     for (const sec of this.sections) {
@@ -572,6 +681,7 @@ export class LineEngine {
         break;
       }
     }
+    tone = lerp(tone, 0, this.photoAlpha);
     // the colour eases toward the surface's colour over a few frames
     const k = this.colorInit ? 0.2 : 1;
     this.colorInit = true;
@@ -628,6 +738,47 @@ export class LineEngine {
       }
       f.el.style.transform = `translate3d(0, ${offset.toFixed(2)}px, 0)`;
     }
+  }
+
+  /**
+   * The stage's photo window: hidden, fading in on the stage, growing into the
+   * closing photograph, or handed over to the photograph in the flow. The image
+   * box inside the frame is placed with the same cover math the line uses, so
+   * the ridge is on the picture by construction.
+   */
+  private updateWindow() {
+    const frame = this.stagePhotoEl;
+    const img = this.stagePhotoImg;
+    if (!frame || !img) return;
+    const photo = this.nodes.find((n) => n.kind === "photo");
+    const f = this.windowFrame;
+    const key =
+      f === null
+        ? "hidden"
+        : f === "handover"
+          ? "handover"
+          : [f.rect.left, f.rect.top, f.rect.width, f.rect.height, f.focus, f.alpha].map((v) => v.toFixed(2)).join(",");
+    if (key === this.lastWindowKey) return;
+    this.lastWindowKey = key;
+    if (f === null || f === "handover") {
+      frame.style.opacity = "0";
+      frame.style.visibility = "hidden";
+      photo?.el?.style.setProperty("--photo-show", f === "handover" ? "1" : "0");
+      return;
+    }
+    const { rect, focus, alpha } = f;
+    frame.style.visibility = "visible";
+    frame.style.opacity = alpha.toFixed(3);
+    frame.style.left = `${rect.left.toFixed(1)}px`;
+    frame.style.top = `${rect.top.toFixed(1)}px`;
+    frame.style.width = `${rect.width.toFixed(1)}px`;
+    frame.style.height = `${rect.height.toFixed(1)}px`;
+    const t = coverTransform(this.ridge.width, this.ridge.height, rect.width, rect.height, focus, 0.5);
+    img.style.left = `${t.offsetX.toFixed(1)}px`;
+    img.style.top = `${t.offsetY.toFixed(1)}px`;
+    img.style.width = `${t.drawWidth.toFixed(1)}px`;
+    img.style.height = `${t.drawHeight.toFixed(1)}px`;
+    photo?.el?.style.setProperty("--photo-show", "0");
   }
 
   /** stroke-dashoffset draw-in during the opening */
