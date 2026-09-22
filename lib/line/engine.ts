@@ -736,7 +736,8 @@ export class LineEngine {
   /**
    * Followers stay glued to the line: while the line rides or pins on their
    * anchor they are shifted so their point sits on the current shape; before
-   * that they rest at their ridge positions, afterwards on the flattened line.
+   * that they are hidden, because the line is still on its way and would cross
+   * them; afterwards they rest on the flattened line and scroll out with it.
    */
   private updateFollowers(s: number, y: number) {
     const tops = new Map<Node, number>();
@@ -744,8 +745,10 @@ export class LineEngine {
       const n = f.node;
       if (!n || !n.el) continue;
       let offset: number;
+      let opacity: number;
       if (s < n.start) {
         offset = 0;
+        opacity = 0;
       } else if (s <= n.end || (n.pin && s <= n.holdEnd)) {
         let top = tops.get(n);
         if (top === undefined) {
@@ -753,13 +756,17 @@ export class LineEngine {
           tops.set(n, top);
         }
         const lineY = (y + this.dyAt(f.x)) * this.vh;
-        // ramp the grip in over a short scroll distance so the line's lag does not arrive as a jump
+        // ramp the grip in over a short scroll distance so the line's lag does not arrive as a jump,
+        // and only then fade the labels in, on the line
         const grip = easeInOutQuad(clamp((s - n.start) / (0.15 * this.vh)));
         offset = (lineY - (top + f.dy * this.vh)) * grip;
+        opacity = easeInOutQuad(clamp((s - n.start - 0.12 * this.vh) / (0.15 * this.vh)));
       } else {
         offset = -f.dy * this.vh;
+        opacity = 1;
       }
       f.el.style.transform = `translate3d(0, ${offset.toFixed(2)}px, 0)`;
+      f.el.style.opacity = opacity.toFixed(3);
     }
   }
 

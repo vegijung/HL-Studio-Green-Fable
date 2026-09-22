@@ -87,6 +87,11 @@ html[data-line="on"] [data-photo-box] {
   opacity: var(--photo-show, 0);
 }
 
+/* followers (the facts labels) wait for the line to arrive; the engine fades them in on it */
+html[data-line="on"] [data-line-follow] {
+  opacity: 0;
+}
+
 html[data-line="on"] [data-line-placeholder] {
   visibility: hidden;
 }
