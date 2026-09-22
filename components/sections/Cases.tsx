@@ -66,7 +66,7 @@ export function Cases({ content }: { content: SiteContent["cases"] }) {
             <p className="mt-3 text-[14px] leading-relaxed text-charcoal/80" data-line-gap>
               {item.text}
             </p>
-            <div className="mt-6 self-end border-t border-fog pt-5">
+            <div className="mt-6 self-start border-t border-fog pt-5">
               <BeforeAfter item={item} />
             </div>
             <p className="mt-5 font-serif text-[1rem] leading-snug" data-line-gap>
