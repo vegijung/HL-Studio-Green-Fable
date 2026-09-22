@@ -12,12 +12,13 @@ export function Prices({ content }: { content: SiteContent["prices"] }) {
 
       <Hairline className="mt-12 lg:mt-14" />
 
+      {/* subgrid: name, price, period, lead and features share one row each across the columns */}
       <div className="grid gap-y-12 sm:grid-cols-2 sm:gap-y-0 lg:grid-cols-4">
         {content.columns.map((column, i) => (
           <div
             key={column.name}
             className={cx(
-              "flex flex-col pt-7",
+              "flex flex-col pt-7 sm:grid sm:grid-rows-subgrid sm:row-span-5",
               i % 2 === 1 && "sm:border-l sm:border-fog sm:pl-6",
               i % 2 === 0 && "sm:pr-6",
               i >= 2 && "sm:border-t sm:border-fog lg:border-t-0",

@@ -35,7 +35,7 @@ export function ServicesOverview({ content }: { content: SiteContent["services"]
       {/* why HL Studio: four short points, quiet, under the names */}
       <ul className="mt-12 grid grid-cols-1 gap-x-8 gap-y-8 sm:grid-cols-2 lg:mt-14 lg:grid-cols-4">
         {content.usps.map((usp) => (
-          <li key={usp.title} className="border-t border-fog pt-4">
+          <li key={usp.title} className="border-t border-fog pt-4 sm:grid sm:grid-rows-subgrid sm:row-span-2">
             <p className="label" data-line-gap>
               {usp.title}
             </p>

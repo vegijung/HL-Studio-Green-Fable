@@ -1,4 +1,3 @@
-import { Grid } from "@/components/Container";
 import { Hairline } from "@/components/Hairline";
 import { Section, SectionHead } from "@/components/Section";
 import { TeamMember } from "@/components/sections/TeamMember";
@@ -11,14 +10,11 @@ export function Team({ content }: { content: SiteContent["team"] }) {
     <Section id="team" narrow>
       <SectionHead label={content.label} title={content.h2} text={content.text} />
 
-      <Grid className="mt-12 items-start lg:mt-14">
-        <div className="col-span-12 lg:col-span-6">
-          <TeamMember member={first} sizes="176px" />
-        </div>
-        <div className="col-span-12 mt-10 lg:col-span-6 lg:mt-0">
-          <TeamMember member={second} sizes="176px" />
-        </div>
-      </Grid>
+      {/* both founders on the same four rows: name, role, text, profile */}
+      <div className="mt-12 grid gap-y-10 lg:mt-14 lg:grid-cols-2 lg:gap-x-10 lg:gap-y-0">
+        <TeamMember member={first} sizes="176px" />
+        <TeamMember member={second} sizes="176px" />
+      </div>
 
       <Hairline className="mt-12 lg:mt-14" />
     </Section>
