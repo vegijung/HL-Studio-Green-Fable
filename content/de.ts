@@ -236,6 +236,9 @@ export const de: SiteContent = {
         text: "Klärt mit dir, was sich lohnt, und bleibt bis zum Livegang deine Ansprechperson.",
         image: "/team/janis.png",
         alt: "Porträt von Janis Locher",
+        // Platzhalter, Entwurf. Bitte prüfen.
+        facts: ["Aufgewachsen in Brig", "Betriebswirtschaft, Universität St. Gallen", "Seit 2024 täglich mit KI-Werkzeugen in Projekten"],
+        more: "Übersetzt zwischen dem, was ein Betrieb braucht, und dem, was die Technik kann. Und sagt es dir, wenn sich etwas nicht lohnt.",
       },
       {
         name: "Raphael Hildbrand",
@@ -244,6 +247,9 @@ export const de: SiteContent = {
         text: "Baut Websites und Automationen selbst, von der ersten Zeile bis zum Hosting in der Schweiz.",
         image: "/team/raphael.png",
         alt: "Porträt von Raphael Hildbrand",
+        // Platzhalter, Entwurf. Bitte prüfen.
+        facts: ["Aufgewachsen im Oberwallis", "Informatik und Wirtschaft, Universität St. Gallen", "Baut seit zwei Jahren mit KI, vom Prototyp bis zum Betrieb"],
+        more: "Nimmt einen Ablauf auseinander, bis klar ist, was eine Maschine übernehmen kann. Dann baut er es so, dass es im Alltag hält.",
       },
     ],
   },

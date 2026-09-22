@@ -68,6 +68,9 @@ export interface Member {
   text: string;
   image: string;
   alt: string;
+  /** shown when the portrait is hovered or tapped: a few short facts and one sentence */
+  facts: string[];
+  more: string;
 }
 
 export interface LegalSection {
