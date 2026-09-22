@@ -59,24 +59,38 @@ const browser: Pt[] = (() => {
 })();
 
 /**
- * Automationen: the thread feeding back into itself. A figure of eight whose
- * two lobes stand on the baseline: the thread runs up into the left loop,
- * through the crossing into the right loop and back down onto the line.
+ * Automationen: the thread feeding back into itself, a cycle. It runs up the
+ * right side of a circle standing on the baseline, over the top, down the left
+ * side and out, with an arrowhead at two and eight o'clock in the direction of
+ * travel, each drawn out and back on itself.
  */
 const loops: Pt[] = (() => {
-  const a = 0.78;
-  const cy = 1 - a / 2;
-  const pts: Pt[] = [[0, 1]];
-  const steps = 96;
-  const t0 = (7 * Math.PI) / 4;
-  for (let i = 0; i <= steps; i++) {
-    const t = t0 + (2 * Math.PI * i) / steps;
-    pts.push([0.5 + 0.5 * Math.sin(t), cy - (a / 2) * Math.sin(2 * t)]);
+  const cx = 0.5;
+  const rad = 0.36;
+  const cy = 1 - rad;
+  const pts: Pt[] = [
+    [0, 1],
+    [cx, 1],
+  ];
+  const at = (deg: number): Pt => [cx + rad * Math.cos((deg * Math.PI) / 180), cy + rad * Math.sin((deg * Math.PI) / 180)];
+  const arrows = new Set([-30, -210]);
+  // from the bottom (90°) round the circle with the angle decreasing: up the right side first
+  for (let deg = 90; deg >= -270; deg -= 5) {
+    const tip = at(deg);
+    pts.push(tip);
+    if (arrows.has(deg)) {
+      const a = (deg * Math.PI) / 180;
+      const d = [Math.sin(a), -Math.cos(a)]; // direction of travel
+      const n = [Math.cos(a), Math.sin(a)]; // outward normal
+      const len = 0.12;
+      const half = 0.08;
+      const barb = (sign: number): Pt => [tip[0] - len * d[0] + sign * half * n[0], tip[1] - len * d[1] + sign * half * n[1]];
+      pts.push(barb(1), tip, barb(-1), tip);
+    }
   }
   pts.push([1, 1]);
   return pts;
 })();
-
 /**
  * Backoffice: a sheet with a folded corner, ticked off. Up the left edge,
  * across the top into the fold, down the right edge as far as the tick, the

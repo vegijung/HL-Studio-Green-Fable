@@ -6,7 +6,7 @@ import { Hairline } from "@/components/Hairline";
 import ridgeJson from "@/content/ridge.json";
 import { toRidgeData } from "@/lib/ridge";
 import { pickFactSpots } from "@/lib/line/facts";
-import { ridgeState, stretchState } from "@/lib/line/states";
+import { dyAtX, ridgeState, stretchState, type LineState } from "@/lib/line/states";
 import { cx } from "@/lib/cx";
 import type { Fact } from "@/content/types";
 
@@ -35,6 +35,19 @@ interface Layout {
   height: number;
   baseline: number;
   spots: Spot[];
+  /** the facts ridge the spots were picked on, and the viewport it was computed for */
+  state: LineState;
+  vw: number;
+  vh: number;
+}
+
+/** where a label ended up after the push-apart: its centre, and the line under that centre */
+interface Placed {
+  left: number;
+  x: number;
+  bottom: number;
+  xNorm: number;
+  dy: number;
 }
 
 /**
@@ -70,7 +83,7 @@ export function FactsRidge({ facts }: { facts: Fact[] }) {
   const ref = useRef<HTMLDivElement>(null);
   const labelRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [layout, setLayout] = useState<Layout | null>(null);
-  const [lefts, setLefts] = useState<number[] | null>(null);
+  const [placed, setPlaced] = useState<Placed[] | null>(null);
 
   useEffect(() => {
     const el = ref.current;
@@ -78,13 +91,15 @@ export function FactsRidge({ facts }: { facts: Fact[] }) {
     const compute = () => {
       // hidden until the engine switches the layout on; measuring now would read a zero offset
       if (el.getBoundingClientRect().width === 0) return;
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
+      // the layout viewport without the scrollbar, the same frame the engine draws in
+      const vw = document.documentElement.clientWidth || window.innerWidth;
+      const vh = document.documentElement.clientHeight || window.innerHeight;
       const hero = document.getElementById("hero");
       const box = hero ? hero.getBoundingClientRect() : { width: vw, height: vh };
       const { state } = ridgeState(ridge, box.width, box.height, vw, vh);
+      const stretched = stretchState(state, 1.3);
       const spots = pickFactSpots(
-        stretchState(state, 1.3),
+        stretched,
         facts.length,
         facts.map((f) => Math.max(Math.min(f.value.length, 8) * 3, Math.min(f.label.length, 17))),
       );
@@ -96,10 +111,13 @@ export function FactsRidge({ facts }: { facts: Fact[] }) {
       const height = Math.round(above + below);
       const baseline = Math.round(above);
       const left = el.getBoundingClientRect().left;
-      setLefts(null);
+      setPlaced(null);
       setLayout({
         height,
         baseline,
+        state: stretched,
+        vw,
+        vh,
         spots: spots.map((s) => ({
           fact: s.fact,
           kind: s.kind,
@@ -127,13 +145,22 @@ export function FactsRidge({ facts }: { facts: Fact[] }) {
     };
   }, [facts]);
 
-  // second pass: measure the rendered labels and push them apart
+  // second pass: measure the rendered labels, push them apart, and put each leader under its
+  // label's centre, with the foot on the line at that x (not on the spot the label was picked for)
   useLayoutEffect(() => {
     if (!layout || !ref.current) return;
     const widths = layout.spots.map((_, i) => labelRefs.current[i]?.offsetWidth ?? 0);
     // labels may overflow the content column but stay inside the viewport
     const left = ref.current.getBoundingClientRect().left;
-    setLefts(resolveLefts(layout.spots.map((s) => s.x), widths, 24 - left, window.innerWidth - left - 24));
+    const lefts = resolveLefts(layout.spots.map((s) => s.x), widths, 24 - left, layout.vw - left - 24);
+    setPlaced(
+      lefts.map((l, i) => {
+        const x = l + widths[i] / 2;
+        const xNorm = (left + x) / layout.vw;
+        const dy = dyAtX(layout.state, xNorm);
+        return { left: l, x, xNorm, dy, bottom: layout.height - (layout.baseline + dy * layout.vh) };
+      }),
+    );
     const frame = requestAnimationFrame(() => ScrollTrigger.refresh());
     return () => cancelAnimationFrame(frame);
   }, [layout]);
@@ -160,19 +187,18 @@ export function FactsRidge({ facts }: { facts: Fact[] }) {
       {layout?.spots.map((spot, i) => {
         const fact = facts[spot.fact];
         const wrap = fact.value.length > 8;
+        const p = placed?.[i];
+        const x = p ? p.x : spot.x;
+        const bottom = p ? p.bottom : spot.bottom;
         return (
           <div
             key={fact.value}
             data-line-follow="facts"
-            data-line-follow-x={spot.xNorm.toFixed(4)}
-            data-line-follow-dy={spot.dy.toFixed(4)}
+            data-line-follow-x={(p ? p.xNorm : spot.xNorm).toFixed(4)}
+            data-line-follow-dy={(p ? p.dy : spot.dy).toFixed(4)}
             className="pointer-events-none absolute inset-0 will-change-transform"
           >
-            <span
-              aria-hidden
-              className="absolute w-px bg-fog"
-              style={{ left: spot.x, bottom: spot.bottom, height: LEADER }}
-            />
+            <span aria-hidden className="absolute w-px bg-fog" style={{ left: x, bottom, height: LEADER }} />
             {/* no data-line-gap here on purpose: the line passes behind these labels uncut */}
             <div
               ref={(node) => {
@@ -180,9 +206,9 @@ export function FactsRidge({ facts }: { facts: Fact[] }) {
               }}
               className="absolute w-max max-w-[17ch] text-center"
               style={{
-                left: lefts ? lefts[i] : spot.x,
-                bottom: spot.bottom + LEADER + 6,
-                visibility: lefts ? "visible" : "hidden",
+                left: p ? p.left : spot.x,
+                bottom: bottom + LEADER + 6,
+                visibility: p ? "visible" : "hidden",
               }}
             >
               <p
