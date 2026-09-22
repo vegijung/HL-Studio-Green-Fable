@@ -171,7 +171,18 @@ interface Follower {
   x: number;
   dy: number;
   node: Node | null;
+  /** the label above the line: its horizontal span (normalised x), the leader's foot (px from the wrapper's bottom), the leader and the label */
+  span: [number, number] | null;
+  foot: number;
+  leader: HTMLElement | null;
+  label: HTMLElement | null;
+  lastLeader: number;
 }
+
+/** a follower's label keeps at least this far above the highest point of the line under its width, on a leader at least this long */
+const FOLLOW_LEADER_MIN = 22;
+const FOLLOW_CLEAR = 14;
+const FOLLOW_LABEL_GAP = 6;
 
 interface StageStep {
   /** scroll position that drives this step: the morph into it runs while it passes from STAGE_MORPH_FROM to STAGE_MORPH_TO */
@@ -497,12 +508,20 @@ export class LineEngine {
       el,
       group: el.closest<HTMLElement>("[data-line-gap-group]"),
     }));
-    this.followers = Array.from(document.querySelectorAll<HTMLElement>("[data-line-follow]")).map((el) => ({
-      el,
-      x: Number(el.dataset.lineFollowX),
-      dy: Number(el.dataset.lineFollowDy),
-      node: this.nodes.find((n) => n.el?.dataset.lineAnchor === el.dataset.lineFollow) ?? null,
-    }));
+    this.followers = Array.from(document.querySelectorAll<HTMLElement>("[data-line-follow]")).map((el) => {
+      const span = el.dataset.lineFollowSpan?.split(/\s+/).map(Number);
+      return {
+        el,
+        x: Number(el.dataset.lineFollowX),
+        dy: Number(el.dataset.lineFollowDy),
+        node: this.nodes.find((n) => n.el?.dataset.lineAnchor === el.dataset.lineFollow) ?? null,
+        span: span && span.length === 2 && span.every(Number.isFinite) ? [span[0], span[1]] : null,
+        foot: Number(el.dataset.lineFollowFoot) || 0,
+        leader: el.querySelector<HTMLElement>("[data-follow-leader]"),
+        label: el.querySelector<HTMLElement>("[data-follow-label]"),
+        lastLeader: -1,
+      };
+    });
 
     const hero = document.getElementById("hero");
     const box = hero ? hero.getBoundingClientRect() : { width: this.vw, height: this.vh };
@@ -1055,6 +1074,25 @@ export class LineEngine {
     return energy;
   }
 
+  /**
+   * The line under a label is not flat, and while it flattens the peaks next
+   * to the label's centre sink at their own pace: the leader stretches every
+   * frame so the label stays clear of the highest point of the current line
+   * under its whole width.
+   */
+  private stretchLeader(f: Follower, footDy: number) {
+    if (!f.span || !f.leader || !f.label) return;
+    const [x0, x1] = f.span;
+    let top = footDy;
+    const samples = 24;
+    for (let k = 0; k <= samples; k++) top = Math.min(top, this.dyAt(x0 + ((x1 - x0) * k) / samples));
+    const needed = Math.max(FOLLOW_LEADER_MIN, (footDy - top) * this.vh + FOLLOW_CLEAR);
+    if (Math.abs(needed - f.lastLeader) < 0.5) return;
+    f.lastLeader = needed;
+    f.leader.style.height = `${needed.toFixed(1)}px`;
+    f.label.style.bottom = `${(f.foot + needed + FOLLOW_LABEL_GAP).toFixed(1)}px`;
+  }
+
   /** the rope's vertical displacement at a normalised x, by the nearest point */
   private offYAt(x: number): number {
     const xs = this.work.x;
@@ -1097,12 +1135,14 @@ export class LineEngine {
           top = n.el.getBoundingClientRect().top;
           tops.set(n, top);
         }
-        const lineY = (y + this.dyAt(f.x)) * this.vh + this.offYAt(f.x);
+        const footDy = this.dyAt(f.x);
+        const lineY = (y + footDy) * this.vh + this.offYAt(f.x);
         // ramp the grip in over a short scroll distance so the line's lag does not arrive as a jump,
         // and only then fade the labels in, on the line
         const grip = easeInOutQuad(clamp((s - n.start) / (0.15 * this.vh)));
         offset = (lineY - (top + f.dy * this.vh)) * grip;
         opacity = easeInOutQuad(clamp((s - n.start - 0.12 * this.vh) / (0.15 * this.vh)));
+        this.stretchLeader(f, footDy);
       } else {
         offset = -f.dy * this.vh;
         opacity = 1;

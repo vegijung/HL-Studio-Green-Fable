@@ -16,8 +16,8 @@ export interface FactSpot {
   fact: number;
 }
 
-const X_MIN = 0.07;
-const X_MAX = 0.93;
+const X_MIN = 0.09;
+const X_MAX = 0.91;
 /** minimum horizontal distance between two spots; the labels lean away from close neighbours */
 const MIN_SPACING = 0.115;
 

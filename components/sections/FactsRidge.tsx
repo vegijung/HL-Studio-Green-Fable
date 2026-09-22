@@ -14,9 +14,12 @@ const ridge = toRidgeData(ridgeJson);
 
 /** space reserved above a spot for numeral, label and leader */
 const LABEL_H = 150;
+/** the leader's minimum length; it grows where the ridge rises under the label */
 const LEADER = 22;
+/** the label's text stays at least this far above the ridge anywhere under it */
+const RIDGE_CLEAR = 14;
 /** minimum horizontal gap between two labels */
-const LABEL_GAP = 18;
+const LABEL_GAP = 20;
 /** the spot must lie at least this far inside its label's horizontal span */
 const LABEL_MARGIN = 14;
 
@@ -45,9 +48,14 @@ interface Layout {
 interface Placed {
   left: number;
   x: number;
+  /** the leader's foot on the line under the label's centre, and the leader's length up to the label */
   bottom: number;
+  leader: number;
   xNorm: number;
   dy: number;
+  /** the label's horizontal span in normalised viewport x, for the engine's per-frame clearance */
+  spanLeft: number;
+  spanRight: number;
 }
 
 /**
@@ -150,15 +158,23 @@ export function FactsRidge({ facts }: { facts: Fact[] }) {
   useLayoutEffect(() => {
     if (!layout || !ref.current) return;
     const widths = layout.spots.map((_, i) => labelRefs.current[i]?.offsetWidth ?? 0);
-    // labels may overflow the content column but stay inside the viewport
-    const left = ref.current.getBoundingClientRect().left;
-    const lefts = resolveLefts(layout.spots.map((s) => s.x), widths, 24 - left, layout.vw - left - 24);
+    // labels stay inside the content column
+    const rect = ref.current.getBoundingClientRect();
+    const left = rect.left;
+    const lefts = resolveLefts(layout.spots.map((s) => s.x), widths, 0, rect.width);
     setPlaced(
       lefts.map((l, i) => {
         const x = l + widths[i] / 2;
         const xNorm = (left + x) / layout.vw;
         const dy = dyAtX(layout.state, xNorm);
-        return { left: l, x, xNorm, dy, bottom: layout.height - (layout.baseline + dy * layout.vh) };
+        const bottom = layout.height - (layout.baseline + dy * layout.vh);
+        // the ridge may rise under the label away from its centre: keep the text above its highest point
+        let highest = dy;
+        const samples = Math.max(12, Math.ceil(widths[i] / 3));
+        for (let k = 0; k <= samples; k++) highest = Math.min(highest, dyAtX(layout.state, (left + l + (widths[i] * k) / samples) / layout.vw));
+        const ridgeTop = layout.height - (layout.baseline + highest * layout.vh);
+        const leader = Math.max(LEADER, ridgeTop + RIDGE_CLEAR - bottom);
+        return { left: l, x, xNorm, dy, bottom, leader, spanLeft: (left + l) / layout.vw, spanRight: (left + l + widths[i]) / layout.vw };
       }),
     );
     const frame = requestAnimationFrame(() => ScrollTrigger.refresh());
@@ -190,24 +206,28 @@ export function FactsRidge({ facts }: { facts: Fact[] }) {
         const p = placed?.[i];
         const x = p ? p.x : spot.x;
         const bottom = p ? p.bottom : spot.bottom;
+        const leader = p ? p.leader : LEADER;
         return (
           <div
             key={fact.value}
             data-line-follow="facts"
             data-line-follow-x={(p ? p.xNorm : spot.xNorm).toFixed(4)}
             data-line-follow-dy={(p ? p.dy : spot.dy).toFixed(4)}
+            data-line-follow-span={p ? `${p.spanLeft.toFixed(4)} ${p.spanRight.toFixed(4)}` : undefined}
+            data-line-follow-foot={bottom.toFixed(1)}
             className="pointer-events-none absolute inset-0 will-change-transform"
           >
-            <span aria-hidden className="absolute w-px bg-fog" style={{ left: x, bottom, height: LEADER }} />
+            <span aria-hidden data-follow-leader className="absolute w-px bg-fog" style={{ left: x, bottom, height: leader }} />
             {/* no data-line-gap here on purpose: the line passes behind these labels uncut */}
             <div
               ref={(node) => {
                 labelRefs.current[i] = node;
               }}
-              className="absolute w-max max-w-[17ch] text-center"
+              data-follow-label
+              className="absolute w-max max-w-[9.5rem] text-center 2xl:max-w-[11.5rem]"
               style={{
                 left: p ? p.left : spot.x,
-                bottom: bottom + LEADER + 6,
+                bottom: bottom + leader + 6,
                 visibility: p ? "visible" : "hidden",
               }}
             >
