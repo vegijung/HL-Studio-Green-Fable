@@ -98,6 +98,24 @@ const TURN_PER_VH = 1.5;
 /** the hover on the overview may take the thread while nothing is on the stage or the first sculpture has barely begun to form */
 const HOVER_UNTIL_P = 0.6;
 const SPIN_RATE = 0.9;
+/**
+ * The thread as a rope: every point carries a displacement from the engine's
+ * shape that springs back (ROPE_SPRING, 1/s^2), is pulled toward its
+ * neighbours' displacement so the thread stays smooth (ROPE_COUPLING), and
+ * is damped (ROPE_DAMPING, 1/s). Scrolling makes it sag by its inertia
+ * (ROPE_SWING, velocity per px of scroll, weighted toward the middle), the
+ * cursor pushes it away within ROPE_REACH px (up to ROPE_PUSH px), and the
+ * displacement never exceeds ROPE_MAX px.
+ */
+const ROPE_SPRING = 90;
+const ROPE_COUPLING = 1400;
+/** the rope integrates in fixed substeps of this length (s), so it is stable whatever the frame rate */
+const ROPE_STEP = 1 / 240;
+const ROPE_DAMPING = 5.5;
+const ROPE_SWING = 5;
+const ROPE_REACH = 90;
+const ROPE_PUSH = 58;
+const ROPE_MAX = 56;
 
 const IVORY = [247, 245, 239];
 const FOREST = [46, 75, 63];
@@ -192,6 +210,23 @@ export class LineEngine {
   private tmpB = emptyState();
   private xs = new Float64Array(N);
   private ys = new Float64Array(N);
+  /** the rope: the engine's shape before displacement, the displacement, its velocity, and the cursor */
+  private baseX = new Float64Array(N);
+  private baseY = new Float64Array(N);
+  private offX = new Float64Array(N);
+  private offY = new Float64Array(N);
+  private velX = new Float64Array(N);
+  private velY = new Float64Array(N);
+  private prevX = new Float64Array(N);
+  private prevY = new Float64Array(N);
+  private ropeActive = false;
+  private cursor: { x: number; y: number } | null = null;
+  private readonly onPointerMove = (e: PointerEvent) => {
+    this.cursor = { x: e.clientX, y: e.clientY };
+  };
+  private readonly onPointerOut = () => {
+    this.cursor = null;
+  };
 
   private nodes: Node[] = [];
   private sections: Section[] = [];
@@ -265,6 +300,9 @@ export class LineEngine {
     ScrollTrigger.refresh();
     this.rendered = window.scrollY;
     gsap.ticker.add(this.tick);
+    window.addEventListener("pointermove", this.onPointerMove, { passive: true });
+    document.addEventListener("pointerleave", this.onPointerOut);
+    window.addEventListener("blur", this.onPointerOut);
 
     // the hero box is the ridge's reference frame; when its size settles (fonts, clearance), re-measure
     const hero = document.getElementById("hero");
@@ -282,6 +320,9 @@ export class LineEngine {
 
   destroy() {
     gsap.ticker.remove(this.tick);
+    window.removeEventListener("pointermove", this.onPointerMove);
+    document.removeEventListener("pointerleave", this.onPointerOut);
+    window.removeEventListener("blur", this.onPointerOut);
     this.heroObserver?.disconnect();
     ScrollTrigger.removeEventListener("refresh", this.onRefresh);
     for (const n of this.nodes) {
@@ -881,9 +922,12 @@ export class LineEngine {
     this.lastFrameAt = now;
     if (this.hoverMix > 0) this.hoverTurn += SPIN_RATE * dt;
 
+    // the rope reacts to the scroll and the cursor and keeps moving until it has settled
+    const swung = this.stepRope(dt, this.rendered - this.lastRendered);
+
     // render() clears `dirty` itself once the colour has converged; a moving or spinning hover renders too
     const hovering = this.updateHover() || this.hoverMix > 0;
-    if (this.rendered !== this.lastRendered || this.dirty || hovering) {
+    if (this.rendered !== this.lastRendered || this.dirty || hovering || swung) {
       this.render(this.rendered);
       this.lastRendered = this.rendered;
     }
@@ -898,8 +942,10 @@ export class LineEngine {
     const { y, opacity } = this.evaluate(s);
     const w = this.work;
     for (let i = 0; i < N; i++) {
-      this.xs[i] = w.x[i] * this.vw;
-      this.ys[i] = (y + w.dy[i]) * this.vh;
+      this.baseX[i] = w.x[i] * this.vw;
+      this.baseY[i] = (y + w.dy[i]) * this.vh;
+      this.xs[i] = this.baseX[i] + this.offX[i];
+      this.ys[i] = this.baseY[i] + this.offY[i];
     }
     this.path.setAttribute("d", catmullRomPath(this.xs, this.ys));
     this.path.setAttribute("stroke-opacity", opacity.toFixed(3));
@@ -945,6 +991,78 @@ export class LineEngine {
     return 1;
   }
 
+  /**
+   * One step of the rope. `scrolled` is how far the rendered scroll moved
+   * this frame; the thread's inertia turns that into a sag, weighted toward
+   * the middle so the ends stay put. Returns whether the rope is still moving.
+   */
+  private stepRope(frameDt: number, scrolled: number): boolean {
+    if (frameDt <= 0) return this.ropeActive;
+    const steps = Math.max(1, Math.min(12, Math.round(frameDt / ROPE_STEP)));
+    const dt = frameDt / steps;
+    // the scroll's impulse is spread over the substeps
+    const swing = Math.abs(scrolled) > 0.01 ? (scrolled * ROPE_SWING) / steps : 0;
+    let energy = 0;
+    for (let k = 0; k < steps; k++) energy = this.ropeSubstep(dt, swing);
+    this.ropeActive = energy > 0.05;
+    if (!this.ropeActive) {
+      this.offX.fill(0);
+      this.offY.fill(0);
+      this.velX.fill(0);
+      this.velY.fill(0);
+    }
+    return this.ropeActive || energy > 0;
+  }
+
+  /** one substep of the rope; returns the largest displacement or scaled velocity left */
+  private ropeSubstep(dt: number, swing: number): number {
+    const offX = this.offX;
+    const offY = this.offY;
+    const velX = this.velX;
+    const velY = this.velY;
+    const damp = Math.exp(-ROPE_DAMPING * dt);
+    const cur = this.cursor;
+    // every point reads its neighbours from the start of the substep; reading updated ones feeds energy in
+    const pX = this.prevX;
+    const pY = this.prevY;
+    pX.set(offX);
+    pY.set(offY);
+    let energy = 0;
+    for (let i = 0; i < N; i++) {
+      // spring back to the shape, and toward the neighbours' displacement
+      const l = i > 0 ? i - 1 : i;
+      const r = i < N - 1 ? i + 1 : i;
+      let ax = -ROPE_SPRING * pX[i] + ROPE_COUPLING * (pX[l] + pX[r] - 2 * pX[i]);
+      let ay = -ROPE_SPRING * pY[i] + ROPE_COUPLING * (pY[l] + pY[r] - 2 * pY[i]);
+      if (swing) ay += swing * Math.sin((Math.PI * i) / (N - 1)) * 60;
+      if (cur) {
+        const dx = this.baseX[i] + offX[i] - cur.x;
+        const dy = this.baseY[i] + offY[i] - cur.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < ROPE_REACH * ROPE_REACH && d2 > 1) {
+          const d = Math.sqrt(d2);
+          const k = ((ROPE_REACH - d) / ROPE_REACH) * ROPE_PUSH * 40;
+          ax += (dx / d) * k;
+          ay += (dy / d) * k;
+        }
+      }
+      velX[i] = (velX[i] + ax * dt) * damp;
+      velY[i] = (velY[i] + ay * dt) * damp;
+      offX[i] = clamp(offX[i] + velX[i] * dt, -ROPE_MAX, ROPE_MAX);
+      offY[i] = clamp(offY[i] + velY[i] * dt, -ROPE_MAX, ROPE_MAX);
+      energy = Math.max(energy, Math.abs(offX[i]), Math.abs(offY[i]), Math.abs(velX[i]) * 0.02, Math.abs(velY[i]) * 0.02);
+    }
+    return energy;
+  }
+
+  /** the rope's vertical displacement at a normalised x, by the nearest point */
+  private offYAt(x: number): number {
+    const xs = this.work.x;
+    let i = 0;
+    while (i < N - 1 && xs[i] < x) i++;
+    return this.offY[i];
+  }
+
   /** dy of the current shape at a normalised x, by linear interpolation */
   private dyAt(x: number): number {
     const xs = this.work.x;
@@ -979,7 +1097,7 @@ export class LineEngine {
           top = n.el.getBoundingClientRect().top;
           tops.set(n, top);
         }
-        const lineY = (y + this.dyAt(f.x)) * this.vh;
+        const lineY = (y + this.dyAt(f.x)) * this.vh + this.offYAt(f.x);
         // ramp the grip in over a short scroll distance so the line's lag does not arrive as a jump,
         // and only then fade the labels in, on the line
         const grip = easeInOutQuad(clamp((s - n.start) / (0.15 * this.vh)));
