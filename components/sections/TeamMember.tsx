@@ -8,7 +8,8 @@ import type { Member } from "@/content/types";
 /**
  * One founder: portrait beside the caption. Hovering the portrait (or
  * focusing and tapping it, for keyboards and touch) opens a short profile
- * under the caption; the space is reserved so the section never jumps.
+ * under the caption. On desktop the room is reserved so the page never
+ * jumps; on smaller screens the profile unfolds.
  */
 export function TeamMember({ member, sizes }: { member: Member; sizes: string }) {
   const [pinned, setPinned] = useState(false);
@@ -46,20 +47,22 @@ export function TeamMember({ member, sizes }: { member: Member; sizes: string })
         <div
           id={id}
           className={cx(
-            "grid transition-[grid-template-rows,opacity] duration-300 ease-out",
-            "grid-rows-[0fr] opacity-0 group-hover:grid-rows-[1fr] group-hover:opacity-100 group-focus-within:grid-rows-[1fr] group-focus-within:opacity-100",
-            pinned && "grid-rows-[1fr] opacity-100",
+            "grid transition-[grid-template-rows] duration-300 ease-out lg:grid-rows-[1fr]",
+            "grid-rows-[0fr] group-hover:grid-rows-[1fr] group-focus-within:grid-rows-[1fr]",
+            pinned && "grid-rows-[1fr]",
           )}
         >
-          <div className="min-h-0 overflow-hidden">
-            <ul className="mt-4 border-t border-fog pt-3 text-[13px] leading-snug text-charcoal/75">
-              {member.facts.map((fact) => (
-                <li key={fact} className="py-1">
-                  {fact}
-                </li>
-              ))}
-            </ul>
-            <p className="mt-3 font-serif text-[15px] leading-snug">{member.more}</p>
+          <div
+            className={cx(
+              "min-h-0 overflow-hidden transition-[opacity,transform] duration-300 ease-out",
+              "translate-y-1 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100",
+              pinned && "translate-y-0 opacity-100",
+            )}
+          >
+            <p className="mt-4 border-t border-fog pt-3 text-[12.5px] leading-snug text-charcoal/75">
+              {member.facts.join(" · ")}
+            </p>
+            <p className="mt-3 font-serif text-[14px] leading-snug">{member.more}</p>
           </div>
         </div>
       </figcaption>
