@@ -6,7 +6,7 @@ export function Tags({ items, className }: { items: string[]; className?: string
     <p className={`label whitespace-normal text-charcoal/60 ${className ?? ""}`}>
       {items.map((tag, i) => (
         <Fragment key={tag}>
-          {i > 0 && <span className="mx-2">·</span>}
+          {i > 0 && <span className="mx-1"> · </span>}
           <span className="whitespace-nowrap">{tag}</span>
         </Fragment>
       ))}
