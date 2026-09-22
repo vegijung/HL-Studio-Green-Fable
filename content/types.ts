@@ -47,6 +47,8 @@ export interface Case {
   before: Metric;
   after: Metric;
   text: string;
+  /** what the client does with the difference, one sentence */
+  result: string;
   /** path to a client logo, once real cases replace the examples */
   logo?: string;
 }

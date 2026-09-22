@@ -77,7 +77,7 @@ function resolveLefts(xs: number[], widths: number[], minX: number, maxX: number
  * Desktop facts: the six annotations sit on real peaks and saddles of the
  * facts ridge (the hero ridge stretched 1.3x), computed from the same state
  * the engine draws. The baseline hairline is the engine's anchor; when the
- * line reaches it, the section pins for 60vh while the ridge flattens.
+ * line reaches it, the section pins for 45vh while the ridge flattens.
  */
 export function FactsRidge({ facts }: { facts: Fact[] }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -176,7 +176,7 @@ export function FactsRidge({ facts }: { facts: Fact[] }) {
         <Hairline
           anchor="facts"
           shape="ridge-facts"
-          pin="60%"
+          pin="45%"
           pinTarget="#fakten"
           pinAt={0.42}
           pinShape="straight"

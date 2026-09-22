@@ -18,6 +18,7 @@ export const de: SiteContent = {
       { label: "Cases", href: "/#cases" },
       { label: "Preise", href: "/#preise" },
       { label: "Team", href: "/#team" },
+      { label: "Kontakt", href: "/#kontakt" },
     ],
     cta: "Termin buchen",
   },
@@ -47,20 +48,20 @@ export const de: SiteContent = {
     more: "Mehr dazu",
     usps: [
       {
-        title: "Fixpreis",
-        text: "Du weisst vor dem Start, was es kostet und wann es fertig ist. Keine Stundenbudgets, keine Überraschungen.",
+        title: "Zahl und Datum vor dem Start",
+        text: "Du bekommst einen Preis und einen Liefertermin, bevor wir anfangen. Was dazukommt, besprechen wir vorher.",
       },
       {
-        title: "In Tagen, nicht Monaten",
-        text: "Eine Website in fünf Arbeitstagen, eine Automation in zwei bis drei Wochen. Wir bauen mit den Werkzeugen von heute.",
+        title: "Website in fünf Arbeitstagen",
+        text: "Vom Briefing bis zum Livegang. Eine Automation läuft nach zwei bis drei Wochen.",
       },
       {
         title: "Zwei, die selbst bauen",
         text: "Du sprichst vom ersten Gespräch bis zum Livegang mit denselben zwei Leuten, die deine Lösung umsetzen.",
       },
       {
-        title: "Aus dem Oberwallis",
-        text: "Vor Ort in Brig und bei dir im Betrieb, wenn es hilft. Hosting und Daten bleiben in der Schweiz.",
+        title: "Vor Ort in Brig",
+        text: "Bei dir im Betrieb, wenn es hilft. Hosting und Daten bleiben in der Schweiz.",
       },
     ],
     items: [
@@ -139,6 +140,7 @@ export const de: SiteContent = {
         before: { value: "45 min", label: "pro Tag, manuell" },
         after: { value: "5 min", label: "pro Tag, prüfen und senden" },
         text: "Ein Assistent liest Mail, WhatsApp und Booking-Nachrichten und schlägt Antworten im Ton des Hauses vor.",
+        result: "Die Rezeption antwortet zwischen zwei Check-ins, statt abends nachzuholen. Kein Gast wartet länger als eine Stunde.",
       },
       {
         sector: "Handwerk · Visp (Beispiel)",
@@ -146,6 +148,7 @@ export const de: SiteContent = {
         before: { value: "3 Tage", label: "bis zur Offerte" },
         after: { value: "20 min", label: "von der Sprachnotiz zum PDF" },
         text: "Sprachnotiz aufnehmen, Positionen werden erkannt und im Firmentemplate als Offerte ausgegeben.",
+        result: "Die Offerte geht noch am selben Tag raus, bevor der Kunde anderswo anfragt.",
       },
       {
         sector: "Treuhand · Brig (Beispiel)",
@@ -153,6 +156,7 @@ export const de: SiteContent = {
         before: { value: "6 h", label: "pro Woche" },
         after: { value: "30 min", label: "pro Woche, Kontrolle" },
         text: "Eingehende Belege werden gelesen, dem Mandanten zugeordnet und in der Buchhaltung vorerfasst.",
+        result: "Der Freitagnachmittag gehört wieder den Mandanten, nicht dem Belegstapel.",
       },
     ],
   },

@@ -68,6 +68,9 @@ export function Cases({ content }: { content: SiteContent["cases"] }) {
                 <div className="mt-10 max-w-[30rem]">
                   <BeforeAfter item={item} />
                 </div>
+                <p className="mt-8 max-w-[30rem] font-serif text-[1.15rem] leading-snug" data-line-gap>
+                  {item.result}
+                </p>
               </div>
             </Grid>
           </li>
