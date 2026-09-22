@@ -4,7 +4,7 @@ import { Section, SectionHead } from "@/components/Section";
 import { cx } from "@/lib/cx";
 import type { SiteContent } from "@/content/types";
 
-/** Section 11: three columns separated by fog hairlines, no boxes, no badge */
+/** Section 11: four offers in a two-by-two grid separated by fog hairlines, no boxes, no badge */
 export function Prices({ content }: { content: SiteContent["prices"] }) {
   return (
     <Section id="preise" narrow>
@@ -12,14 +12,15 @@ export function Prices({ content }: { content: SiteContent["prices"] }) {
 
       <Hairline className="mt-24 lg:mt-32" />
 
-      <div className="grid gap-y-16 lg:grid-cols-3 lg:gap-y-0">
+      <div className="grid gap-y-16 sm:grid-cols-2 sm:gap-y-0">
         {content.columns.map((column, i) => (
           <div
             key={column.name}
             className={cx(
-              "flex flex-col pt-12 lg:pb-4",
-              i > 0 && "lg:border-l lg:border-fog lg:pl-8",
-              i < content.columns.length - 1 && "lg:pr-8",
+              "flex flex-col pt-12 sm:pb-14",
+              i % 2 === 1 && "sm:border-l sm:border-fog sm:pl-10",
+              i % 2 === 0 && "sm:pr-10",
+              i >= 2 && "sm:border-t sm:border-fog",
             )}
           >
             <p className="label">{column.name}</p>

@@ -9,9 +9,9 @@ import type { Service } from "@/content/types";
 
 /**
  * Sections 6 to 9: the four service chapters in one shared layout, all in the
- * left two thirds: hairline and label, the headline left, the copy with its
- * three points and tags right. A chapter can add one figure under its
- * headline. On desktop the line's stage sits to the right, where the thread
+ * left two thirds: hairline and label, the headline with its second paragraph
+ * left, the short text with three points and the tags right. A chapter can
+ * add one figure under the headline. On desktop the line's stage sits to the right, where the thread
  * is pulled into each chapter's icon as the chapter arrives.
  */
 function Chapter({ service, figure }: { service: Service; figure?: ReactNode }) {
@@ -28,11 +28,11 @@ function Chapter({ service, figure }: { service: Service; figure?: ReactNode }) 
           <h2 className="display-h2" data-line-gap>
             {service.headline}
           </h2>
-          {figure && <div className="mt-16 lg:max-w-[26rem]">{figure}</div>}
+          <p className="body-text mt-8 text-charcoal/80 lg:max-w-[30rem]">{service.detail}</p>
+          {figure && <div className="mt-14 lg:max-w-[26rem]">{figure}</div>}
         </div>
         <div className="col-span-12 mt-12 lg:col-span-5 lg:col-start-8 lg:mt-2">
           <p className="body-text-lg">{service.text}</p>
-          <p className="body-text mt-6 text-charcoal/80">{service.detail}</p>
           <ul className="mt-10">
             {service.points.map((point) => (
               <li key={point} className="border-t border-fog py-4 text-[15px] leading-snug last:border-b">

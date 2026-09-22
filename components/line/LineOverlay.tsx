@@ -24,28 +24,47 @@ export function LineOverlay() {
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
-    const desktop = window.matchMedia("(min-width: 1024px)").matches;
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (!desktop || reduced) return;
-
+    const desktop = window.matchMedia("(min-width: 1024px)");
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
     gsap.registerPlugin(ScrollTrigger);
-    // anchor targets carry scroll-margin-top for the nav; Lenis only smooths the jump
-    const lenis = new Lenis({ lerp: 0.1, anchors: true });
-    lenis.on("scroll", ScrollTrigger.update);
-    const raf = (time: number) => lenis.raf(time * 1000);
-    gsap.ticker.add(raf);
-    gsap.ticker.lagSmoothing(0);
 
-    const engine = new LineEngine(svg, ridge);
-    engine.start();
-    const hero = document.getElementById("hero");
-    const cleanupHero = hero ? setupHero(engine, hero) : undefined;
+    // the engine runs only while the viewport is desktop-sized; below that the static hairlines take over
+    let stop: (() => void) | null = null;
+    const start = () => {
+      // anchor targets carry scroll-margin-top for the nav; Lenis only smooths the jump
+      const lenis = new Lenis({ lerp: 0.1, anchors: true });
+      lenis.on("scroll", ScrollTrigger.update);
+      const raf = (time: number) => lenis.raf(time * 1000);
+      gsap.ticker.add(raf);
+      gsap.ticker.lagSmoothing(0);
+      const engine = new LineEngine(svg, ridge);
+      engine.start();
+      const hero = document.getElementById("hero");
+      const cleanupHero = hero ? setupHero(engine, hero) : undefined;
+      return () => {
+        cleanupHero?.();
+        engine.destroy();
+        gsap.ticker.remove(raf);
+        lenis.destroy();
+        svg.querySelector("[data-line-path]")?.setAttribute("d", "");
+      };
+    };
+    const apply = () => {
+      const wanted = desktop.matches && !reduced.matches;
+      if (wanted && !stop) stop = start();
+      else if (!wanted && stop) {
+        stop();
+        stop = null;
+      }
+    };
+    apply();
+    desktop.addEventListener("change", apply);
+    reduced.addEventListener("change", apply);
 
     return () => {
-      cleanupHero?.();
-      engine.destroy();
-      gsap.ticker.remove(raf);
-      lenis.destroy();
+      desktop.removeEventListener("change", apply);
+      reduced.removeEventListener("change", apply);
+      stop?.();
     };
   }, []);
 
