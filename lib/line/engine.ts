@@ -501,6 +501,8 @@ export class LineEngine {
         this.stageIconShapes[name] = iconState(ICONS[name], iconBox, this.vw, this.vh, x0, x1);
       }
       if (this.stagePhotoEl) {
+        // updateWindow() writes the frame's geometry inline; clear it so we measure the CSS rect, not the last frame's
+        for (const prop of ["left", "top", "width", "height"]) this.stagePhotoEl.style.removeProperty(prop);
         const w = this.stagePhotoEl.getBoundingClientRect();
         this.stageWindow = { left: w.left, top: w.top, width: w.width, height: w.height };
       }
