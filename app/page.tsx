@@ -26,10 +26,10 @@ export default function Home() {
         <Hero content={c.hero} />
         <Facts facts={c.facts} />
         <ServicesOverview content={c.services} />
-        <ChapterWebsites service={websites} />
-        <ChapterAutomationen service={automationen} />
-        <ChapterBackoffice service={backoffice} />
-        <ChapterSchulung service={schulung} />
+        <ChapterWebsites service={websites} more={c.services.more} />
+        <ChapterAutomationen service={automationen} more={c.services.more} />
+        <ChapterBackoffice service={backoffice} more={c.services.more} />
+        <ChapterSchulung service={schulung} more={c.services.more} />
         <Cases content={c.cases} />
         <Prices content={c.prices} />
         <Team content={c.team} />

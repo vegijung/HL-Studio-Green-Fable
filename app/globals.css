@@ -150,13 +150,13 @@ html[data-opening] [data-nav] {
 @utility body-text {
   font-size: 17px;
   line-height: 1.6;
-  max-width: 62ch;
+  max-width: 58ch;
 }
 
 @utility body-text-lg {
   font-size: 18px;
   line-height: 1.6;
-  max-width: 62ch;
+  max-width: 58ch;
 }
 
 /* Playfair Display display sizes, weight 400, tight tracking */

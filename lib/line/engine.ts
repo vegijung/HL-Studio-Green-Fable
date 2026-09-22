@@ -56,6 +56,11 @@ const INERTIA = 0.08;
 const MAX_LAG_VH = 0.5;
 /** padding around text gaps in px */
 const GAP_PAD = 14;
+/** the colour blends across a surface boundary over this band (in vh) instead of switching at it */
+const TONE_BAND_VH = 0.12;
+/** morphs on the stage complete over a shorter scroll distance when the user scrolls fast: 1 + speed / this, capped */
+const SPEED_UNIT_VH_S = 1.2;
+const SPEED_SHARPEN_MAX = 2;
 /** stage: a chapter boundary morphs the icon while it passes from this to that viewport fraction */
 const STAGE_MORPH_FROM = 0.82;
 const STAGE_MORPH_TO = 0.34;
@@ -214,6 +219,10 @@ export class LineEngine {
   private rendered = 0;
   private lastRendered = -1;
   private lastMaskScroll = -1;
+  /** scroll speed in vh per second (smoothed) and the morph sharpening derived from it; both only move while the line moves */
+  private lastTarget = 0;
+  private speed = 0;
+  private sharpen = 0;
   private dirty = true;
   private color = [...FOREST];
   private colorInit = false;
@@ -588,6 +597,8 @@ export class LineEngine {
       k = i;
       p = prog;
     }
+    // a fast scroll compresses the morph around its middle, so a quick pass leaves formed icons, not half ones
+    if (p > 0 && p < 1 && this.sharpen > 0) p = clamp((p - 0.5) * (1 + this.sharpen) + 0.5);
     return { k, p };
   }
 
@@ -787,6 +798,14 @@ export class LineEngine {
     if (!this.vh) return;
     const target = window.scrollY;
     const dist = target - this.rendered;
+    // scroll speed (vh/s at 60fps), smoothed; the sharpening it drives is frozen while the line stands still, so nothing drifts after a stop
+    const v = (Math.abs(target - this.lastTarget) * 60) / this.vh;
+    this.lastTarget = target;
+    this.speed += (v - this.speed) * 0.15;
+    if (Math.abs(dist) >= 0.05) {
+      const wanted = Math.min(SPEED_SHARPEN_MAX, Math.max(0, this.speed / SPEED_UNIT_VH_S - 0.5));
+      this.sharpen += (wanted - this.sharpen) * 0.1;
+    }
     if (Math.abs(dist) < 0.05) {
       this.rendered = target;
     } else {
@@ -824,18 +843,12 @@ export class LineEngine {
     this.updateFollowers(s, y);
     this.updateWindow();
 
-    // colour follows the surface under the line's baseline; on the photograph it is ivory
+    // colour follows the surface under the line's baseline, blending across each boundary; on the photograph it is ivory
     const docY = y * this.vh + s;
-    let tone = 1;
-    for (const sec of this.sections) {
-      if (docY >= sec.top && docY < sec.bottom) {
-        tone = sec.hero ? this.heroFade : sec.tone;
-        break;
-      }
-    }
+    let tone = this.toneAt(docY);
     tone = lerp(tone, 0, this.photoAlpha);
     // the colour eases toward the surface's colour over a few frames
-    const k = this.colorInit ? 0.2 : 1;
+    const k = this.colorInit ? 0.35 : 1;
     this.colorInit = true;
     let remaining = 0;
     for (let c = 0; c < 3; c++) {
@@ -848,6 +861,25 @@ export class LineEngine {
       `rgb(${Math.round(this.color[0])} ${Math.round(this.color[1])} ${Math.round(this.color[2])})`,
     );
     this.dirty = remaining > 0.5;
+  }
+
+  /** the surface tone under a document y (0 dark, 1 ivory), blended over a short band around each section boundary */
+  private toneAt(docY: number): number {
+    const band = TONE_BAND_VH * this.vh;
+    const toneOf = (sec: Section) => (sec.hero ? this.heroFade : sec.tone);
+    const secs = this.sections;
+    for (let i = 0; i < secs.length; i++) {
+      const sec = secs[i];
+      if (docY < sec.top || docY >= sec.bottom) continue;
+      let t = toneOf(sec);
+      const prev = secs[i - 1];
+      const next = secs[i + 1];
+      // sections are contiguous in the flow; blend toward the neighbour across the shared edge
+      if (prev && prev.bottom >= sec.top - 1) t = lerp(toneOf(prev), t, clamp((docY - sec.top) / band + 0.5));
+      if (next && next.top <= sec.bottom + 1) t = lerp(t, toneOf(next), clamp((docY - sec.bottom) / band + 0.5));
+      return t;
+    }
+    return 1;
   }
 
   /** dy of the current shape at a normalised x, by linear interpolation */

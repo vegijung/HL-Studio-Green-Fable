@@ -10,7 +10,7 @@ function Figure({ metric, align }: { metric: Metric; align: "left" | "right" }) 
       <p className="display-figure" data-line-gap>
         {metric.value}
       </p>
-      <p className="mt-2 text-[14px] leading-snug text-charcoal/60">{metric.label}</p>
+      <p className="mt-2 text-[14px] leading-snug text-charcoal/70">{metric.label}</p>
     </div>
   );
 }

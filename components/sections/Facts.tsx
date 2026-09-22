@@ -24,7 +24,7 @@ function Annotation({ fact, below }: { fact: Fact; below: boolean }) {
       <p className="display-numeral" data-line-gap>
         {fact.value}
       </p>
-      <p className="mt-3 max-w-[22ch] text-[15px] leading-snug text-charcoal/70">{fact.label}</p>
+      <p className="mt-3 max-w-[22ch] text-[15px] leading-snug text-charcoal/75">{fact.label}</p>
       {!below && <span aria-hidden className="mt-6 block h-8 w-px bg-fog" />}
     </div>
   );

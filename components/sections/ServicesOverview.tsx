@@ -39,7 +39,7 @@ export function ServicesOverview({ content }: { content: SiteContent["services"]
             <p className="label" data-line-gap>
               {usp.title}
             </p>
-            <p className="mt-3 text-[14px] leading-relaxed text-charcoal/70">{usp.text}</p>
+            <p className="mt-3 text-[14px] leading-relaxed text-charcoal/75">{usp.text}</p>
           </li>
         ))}
       </ul>

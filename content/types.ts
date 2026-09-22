@@ -105,6 +105,8 @@ export interface SiteContent {
     text: string;
     /** why HL Studio, in four short points under the intro */
     usps: Usp[];
+    /** the link from each chapter to its subpage */
+    more: string;
     items: Service[];
   };
   cases: {

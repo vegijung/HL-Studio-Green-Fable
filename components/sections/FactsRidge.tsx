@@ -220,7 +220,7 @@ export function FactsRidge({ facts }: { facts: Fact[] }) {
               >
                 {fact.value}
               </p>
-              <p className="mt-2 text-[13px] leading-snug text-charcoal/70">{fact.label}</p>
+              <p className="mt-2 text-[13px] leading-snug text-charcoal/75">{fact.label}</p>
             </div>
           </div>
         );

@@ -27,7 +27,7 @@ export function Prices({ content }: { content: SiteContent["prices"] }) {
             <p className="display-figure mt-8" data-line-gap>
               {column.price}
             </p>
-            <p className="mt-2 text-[14px] text-charcoal/60">{column.period}</p>
+            <p className="mt-2 text-[14px] text-charcoal/70">{column.period}</p>
             <p className="display-lead mt-10 text-[1.35rem]">{column.lead}</p>
 
             <ul className="mt-10 flex-1 border-t border-fog">
@@ -48,7 +48,7 @@ export function Prices({ content }: { content: SiteContent["prices"] }) {
         ))}
       </div>
 
-      <p className="mt-16 text-[14px] text-charcoal/60">{content.footnote}</p>
+      <p className="mt-16 text-[14px] text-charcoal/70">{content.footnote}</p>
     </Section>
   );
 }

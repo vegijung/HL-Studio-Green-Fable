@@ -14,7 +14,7 @@ import type { Service } from "@/content/types";
  * add one figure under the headline. On desktop the line's stage sits to the right, where the thread
  * is pulled into each chapter's icon as the chapter arrives.
  */
-function Chapter({ service, figure }: { service: Service; figure?: ReactNode }) {
+function Chapter({ service, more, figure }: { service: Service; more: string; figure?: ReactNode }) {
   return (
     <Section id={service.slug} narrow>
       <Hairline />
@@ -41,33 +41,44 @@ function Chapter({ service, figure }: { service: Service; figure?: ReactNode }) 
             ))}
           </ul>
           <Tags items={service.tags} className="mt-8" />
-          {service.link && (
+          {/* one path: the chapter leads to its subpage (and the entry offer to the prices); booking lives in the hero, the prices and the closing */}
+          <p className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-3">
             <Link
-              href={service.link.href}
-              className="mt-10 inline-block text-forest underline decoration-forest/30 underline-offset-[6px] transition-colors hover:decoration-forest"
+              href={`/leistungen/${service.slug}`}
+              className="text-forest underline decoration-forest/30 underline-offset-[6px] transition-colors hover:decoration-forest"
             >
-              {service.link.label}
+              {more} →
             </Link>
-          )}
+            {service.link && (
+              <Link
+                href={service.link.href}
+                className="text-charcoal/75 underline decoration-fog underline-offset-[6px] transition-colors hover:decoration-current"
+              >
+                {service.link.label}
+              </Link>
+            )}
+          </p>
         </div>
       </Grid>
     </Section>
   );
 }
 
-export function ChapterWebsites({ service }: { service: Service }) {
-  return <Chapter service={service} />;
+type ChapterProps = { service: Service; more: string };
+
+export function ChapterWebsites(props: ChapterProps) {
+  return <Chapter {...props} />;
 }
 
-export function ChapterAutomationen({ service }: { service: Service }) {
-  return <Chapter service={service} />;
+export function ChapterAutomationen(props: ChapterProps) {
+  return <Chapter {...props} />;
 }
 
 /** the backoffice chapter keeps its four-step figure under the headline */
-export function ChapterBackoffice({ service }: { service: Service }) {
-  return <Chapter service={service} figure={<ProcessFigure steps={["Eingang", "Erkennen", "Zuordnen", "Kontrolle"]} />} />;
+export function ChapterBackoffice(props: ChapterProps) {
+  return <Chapter {...props} figure={<ProcessFigure steps={["Eingang", "Erkennen", "Zuordnen", "Kontrolle"]} />} />;
 }
 
-export function ChapterSchulung({ service }: { service: Service }) {
-  return <Chapter service={service} />;
+export function ChapterSchulung(props: ChapterProps) {
+  return <Chapter {...props} />;
 }

@@ -44,6 +44,7 @@ export const de: SiteContent = {
     label: "Leistungen",
     h2: "Von der Website bis zur Buchhaltung.",
     text: "Vier Bereiche, ein Team. Du bekommst keine Agentur mit zwölf Ansprechpersonen, sondern zwei Leute, die alles selbst bauen.",
+    more: "Mehr dazu",
     usps: [
       {
         title: "Fixpreis",
@@ -77,7 +78,7 @@ export const de: SiteContent = {
           "Gefunden werden: Google-Eintrag und SEO inklusive",
         ],
         tags: ["Website", "Onlineshop", "SEO", "Newsletter"],
-        link: { label: "Ab CHF 1'000 → Preise", href: "/#preise" },
+        link: { label: "Ab CHF 1'000, Preise ansehen", href: "/#preise" },
       },
       {
         slug: "automationen",
