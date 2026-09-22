@@ -5,7 +5,7 @@ import { cx } from "@/lib/cx";
 type Tone = "ivory" | "dark";
 
 /**
- * Vertical frame for one page section: 112px / 144px padding, surface tone.
+ * Vertical frame for one page section: 80px / 96px padding, surface tone.
  * `className` applies to the <section>, `inner` to the content frame.
  * `narrow` keeps the content in the left two thirds on desktop: the right
  * third is the stage where the line sits with its icons.

@@ -13,8 +13,8 @@ export function ServicesOverview({ content }: { content: SiteContent["services"]
     <Section id="leistungen" narrow>
       <SectionHead label={content.label} title={content.h2} text={content.text} />
 
-      <nav aria-label="Leistungen" className="mt-16 lg:mt-20">
-        <ul className="grid grid-cols-1 gap-x-10 gap-y-10 sm:grid-cols-2">
+      <nav aria-label="Leistungen" className="mt-12 lg:mt-14">
+        <ul className="grid grid-cols-1 gap-x-10 gap-y-6 sm:grid-cols-2">
           {content.items.map((service) => (
             <li key={service.slug}>
               <Link
@@ -33,7 +33,7 @@ export function ServicesOverview({ content }: { content: SiteContent["services"]
       </nav>
 
       {/* why HL Studio: four short points, quiet, under the names */}
-      <ul className="mt-16 grid grid-cols-1 gap-x-8 gap-y-8 sm:grid-cols-2 lg:mt-20 lg:grid-cols-4">
+      <ul className="mt-12 grid grid-cols-1 gap-x-8 gap-y-8 sm:grid-cols-2 lg:mt-14 lg:grid-cols-4">
         {content.usps.map((usp) => (
           <li key={usp.title} className="border-t border-fog pt-4">
             <p className="label" data-line-gap>

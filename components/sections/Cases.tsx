@@ -1,16 +1,16 @@
 import Image from "next/image";
-import { Grid } from "@/components/Container";
 import { Hairline } from "@/components/Hairline";
 import { Section, SectionHead } from "@/components/Section";
+import { cx } from "@/lib/cx";
 import type { Case, Metric, SiteContent } from "@/content/types";
 
 function Figure({ metric, align }: { metric: Metric; align: "left" | "right" }) {
   return (
     <div className={align === "right" ? "text-right" : ""}>
-      <p className="display-figure" data-line-gap>
+      <p className="display-figure whitespace-nowrap text-[1.7rem]" data-line-gap>
         {metric.value}
       </p>
-      <p className="mt-2 text-[14px] leading-snug text-charcoal/70">{metric.label}</p>
+      <p className="mt-1.5 text-[12.5px] leading-snug text-charcoal/70">{metric.label}</p>
     </div>
   );
 }
@@ -18,19 +18,11 @@ function Figure({ metric, align }: { metric: Metric; align: "left" | "right" }) 
 /** before → after, set on a hairline that acts as the axis */
 function BeforeAfter({ item }: { item: Case }) {
   return (
-    <div className="flex items-start gap-6">
+    <div className="flex items-start gap-4">
       <Figure metric={item.before} align="left" />
-      <div aria-hidden className="relative mt-4 flex flex-1 items-center">
+      <div aria-hidden className="relative mt-3.5 flex flex-1 items-center">
         <Hairline />
-        <svg
-          viewBox="0 0 8 12"
-          width="8"
-          height="12"
-          className="-ml-px shrink-0 text-fog"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1"
-        >
+        <svg viewBox="0 0 8 12" width="8" height="12" className="-ml-px shrink-0 text-fog" fill="none" stroke="currentColor" strokeWidth="1">
           <path d="M1 1l6 5-6 5" />
         </svg>
       </div>
@@ -39,40 +31,42 @@ function BeforeAfter({ item }: { item: Case }) {
   );
 }
 
-/** Section 10: three rows, not cards. Built so a logo can replace the sector label later. */
+/**
+ * Section 10: three cases side by side, no cards, separated by fog hairlines
+ * so the section fits one viewport. Built so a logo can replace the sector
+ * label later.
+ */
 export function Cases({ content }: { content: SiteContent["cases"] }) {
   return (
     <Section id="cases" narrow>
       <SectionHead label={content.label} title={content.h2} text={content.text} />
 
-      <ol className="mt-16 lg:mt-20">
-        {content.items.map((item) => (
-          <li key={item.title} className="border-t border-fog py-14 last:border-b lg:py-16">
-            <Grid className="gap-y-8">
-              <div className="col-span-12 lg:col-span-3">
-                {item.logo ? (
-                  <Image src={item.logo} alt={item.sector} width={120} height={40} className="h-8 w-auto" data-line-gap />
-                ) : (
-                  <p className="label text-charcoal/60" data-line-gap>
-                    {item.sector}
-                  </p>
-                )}
-              </div>
-              <div className="col-span-12 lg:col-span-9">
-                <h3 className="display-lead" data-line-gap>
-                  {item.title}
-                </h3>
-                <p className="body-text mt-6 text-[16px] text-charcoal/80" data-line-gap>
-                  {item.text}
-                </p>
-                <div className="mt-10 max-w-[30rem]">
-                  <BeforeAfter item={item} />
-                </div>
-                <p className="mt-8 max-w-[30rem] font-serif text-[1.15rem] leading-snug" data-line-gap>
-                  {item.result}
-                </p>
-              </div>
-            </Grid>
+      <Hairline className="mt-12 lg:mt-14" />
+      <ol className="grid gap-y-10 sm:grid-cols-3 sm:gap-y-0">
+        {content.items.map((item, i) => (
+          <li
+            key={item.title}
+            className={cx("flex flex-col pt-8", i > 0 && "sm:border-l sm:border-fog sm:pl-6", i < 2 && "sm:pr-6")}
+          >
+            {item.logo ? (
+              <Image src={item.logo} alt={item.sector} width={120} height={40} className="h-6 w-auto" data-line-gap />
+            ) : (
+              <p className="label text-charcoal/60" data-line-gap>
+                {item.sector}
+              </p>
+            )}
+            <h3 className="mt-5 font-serif text-[1.3rem] leading-snug tracking-[-0.01em]" data-line-gap>
+              {item.title}
+            </h3>
+            <p className="mt-3 text-[14px] leading-relaxed text-charcoal/80" data-line-gap>
+              {item.text}
+            </p>
+            <div className="mt-6 border-t border-fog pt-5">
+              <BeforeAfter item={item} />
+            </div>
+            <p className="mt-5 font-serif text-[1rem] leading-snug" data-line-gap>
+              {item.result}
+            </p>
           </li>
         ))}
       </ol>
