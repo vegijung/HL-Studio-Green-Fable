@@ -201,6 +201,8 @@ export class LineEngine {
   private stagePhotoEl: HTMLElement | null = null;
   private stagePhotoImg: HTMLElement | null = null;
   private stageWindow: Rect = { left: 0, top: 0, width: 1, height: 1 };
+  /** the window's resting geometry as the markup declares it (inline), restored before every measurement */
+  private stagePhotoBase: Record<string, string> = {};
   /** how far the photograph is present under the line this frame (0..1); drives the window and the colour */
   private photoAlpha = 0;
   /** the window this frame: null while hidden, "handover" once the photo in the flow has taken over */
@@ -371,6 +373,9 @@ export class LineEngine {
 
     this.stagePhotoEl = document.querySelector<HTMLElement>("[data-line-stage-photo]");
     this.stagePhotoImg = this.stagePhotoEl?.firstElementChild as HTMLElement | null;
+    if (this.stagePhotoEl) {
+      for (const prop of ["left", "top", "width", "height"]) this.stagePhotoBase[prop] = this.stagePhotoEl.style.getPropertyValue(prop);
+    }
     const photoEl = document.querySelector<HTMLElement>("[data-line-photo]");
     if (photoEl) {
       this.nodes.push(
@@ -501,8 +506,8 @@ export class LineEngine {
         this.stageIconShapes[name] = iconState(ICONS[name], iconBox, this.vw, this.vh, x0, x1);
       }
       if (this.stagePhotoEl) {
-        // updateWindow() writes the frame's geometry inline; clear it so we measure the CSS rect, not the last frame's
-        for (const prop of ["left", "top", "width", "height"]) this.stagePhotoEl.style.removeProperty(prop);
+        // updateWindow() writes the frame's geometry inline; put the markup's resting geometry back before measuring
+        for (const [prop, value] of Object.entries(this.stagePhotoBase)) this.stagePhotoEl.style.setProperty(prop, value);
         const w = this.stagePhotoEl.getBoundingClientRect();
         this.stageWindow = { left: w.left, top: w.top, width: w.width, height: w.height };
       }
