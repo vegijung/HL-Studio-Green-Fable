@@ -1,165 +1,312 @@
 /**
  * The four one-stroke icons (BRIEF.md section 5, point 7).
  *
- * Each icon is a polyline in a unit box (x and y from 0 to 1, y down). The
- * thread enters at the bottom-left corner (0,1) on the baseline, draws the
- * shape without lifting, and exits at the bottom-right corner (1,1). Where a
- * shape cannot be drawn in one pass, the thread runs back exactly along a
- * line it has already drawn, which stays invisible.
+ * Each icon is one stroke in a unit box (x and y from 0 to 1, y down, z
+ * toward the viewer): a wire sculpture. Projected onto the stage it is still
+ * one polyline: the thread enters at the bottom-left corner (0,1) on the
+ * baseline, draws the shape without lifting, and exits at the bottom-right
+ * corner (1,1). Where a shape cannot be drawn in one pass, the thread runs
+ * back exactly along a line it has already drawn, which stays invisible.
  */
 import { N, resampleByArcLength, type Pt } from "./geometry";
 import { emptyState, type LineState } from "./states";
 
 export type IconName = "browser" | "loops" | "sheet" | "bubble";
 
-/** points on a circle, angles in degrees, screen coordinates (y down) */
-function arc(cx: number, cy: number, r: number, fromDeg: number, toDeg: number, steps: number): Pt[] {
-  const out: Pt[] = [];
-  for (let i = 0; i <= steps; i++) {
-    const a = ((fromDeg + ((toDeg - fromDeg) * i) / steps) * Math.PI) / 180;
-    out.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
-  }
+/** a point in the icon's box: x and y as before, z toward the viewer (positive = nearer) */
+export type Pt3 = [number, number, number];
+
+const DEG = Math.PI / 180;
+
+/** a point on a horizontal circle around the vertical axis through x = 0.5: angle 180 is the left silhouette, 0 the right */
+const onHoop = (y: number, r: number, deg: number): Pt3 => [0.5 + r * Math.cos(deg * DEG), y, r * Math.sin(deg * DEG)];
+
+/** points along a horizontal circle from one angle to another (inclusive) */
+function hoopArc(y: number, r: number, fromDeg: number, toDeg: number, steps: number): Pt3[] {
+  const out: Pt3[] = [];
+  for (let i = 0; i <= steps; i++) out.push(onHoop(y, r, fromDeg + ((toDeg - fromDeg) * i) / steps));
   return out;
 }
 
 /**
- * Websites & Marketing: a browser window with a landscape in it. Up the left
- * edge, over the rounded top, down the right edge; back up to the title bar
- * divider; then along the left edge again to draw the mountain across the
- * window and out along the bottom. Every second pass runs exactly on a line
- * already drawn, so nothing doubles.
+ * A wire surface of revolution drawn as one stroke. `profile` lists the
+ * levels from the bottom up as [y, radius]; each level gets a full parallel
+ * (a hoop) and the levels are joined by `meridians` vertical curves. The
+ * thread climbs the left meridian drawing every parallel on the way, then
+ * runs down and up the other meridians in turn, moving between them along
+ * parallels already drawn (invisible retraces), and ends at the bottom on
+ * the right silhouette. Requires an even number of meridians.
  */
-const browser: Pt[] = (() => {
-  const l = 0.04;
-  const r = 0.96;
-  const top = 0.2;
-  const rad = 0.08;
-  const bar = 0.4;
-  return [
-    [0, 1],
-    [l, 1],
-    [l, top + rad],
-    ...arc(l + rad, top + rad, rad, 180, 270, 8),
-    [r - rad, top],
-    ...arc(r - rad, top + rad, rad, 270, 360, 8),
-    [r, 1],
-    [r, bar],
-    [l, bar], // title bar divider
-    [l, 0.86],
-    [0.2, 0.68],
-    [0.36, 0.5], // the summit
-    [0.5, 0.68],
-    [0.6, 0.6],
-    [0.74, 0.74],
-    [r, 0.82],
-    [r, 1],
-    [l, 1],
-    [1, 1],
-  ];
+function lathe(profile: [number, number][], meridians: number, ringSteps: number): Pt3[] {
+  const L = profile.length - 1;
+  const angle = (j: number) => 180 + (360 * j) / meridians;
+  const P = (i: number, deg: number) => onHoop(profile[i][0], profile[i][1], deg);
+  // the thread enters and leaves through the base's centre, the one point no turn or pitch moves, so the baseline stays straight
+  const centre: Pt3 = [0.5, profile[0][0], 0];
+  const body: Pt3[] = [centre];
+  // up the first meridian, a parallel at every level
+  for (let i = 0; i <= L; i++) {
+    if (profile[i][1] > 0.005) body.push(...hoopArc(profile[i][0], profile[i][1], 180, 540, ringSteps));
+    else body.push(P(i, 180));
+  }
+  // the other meridians, down and up alternately
+  for (let j = 1; j < meridians; j++) {
+    const down = j % 2 === 1;
+    const level = down ? L : 0;
+    // step over to the next meridian along the parallel at this level
+    body.push(...hoopArc(profile[level][0], profile[level][1], angle(j - 1), angle(j), 4).slice(1));
+    if (down) for (let i = L - 1; i >= 0; i--) body.push(P(i, angle(j)));
+    else for (let i = 1; i <= L; i++) body.push(P(i, angle(j)));
+  }
+  // along the bottom parallel to the right silhouette, then in to the centre
+  body.push(...hoopArc(profile[0][0], profile[0][1], angle(meridians - 1), 360, 4).slice(1), centre);
+  return body;
+}
+
+/**
+ * A wire grid drawn as one stroke: every row, then every column, snaking
+ * back and forth and moving between them along lines already drawn. Starts
+ * at grid[0][0] and ends at grid[0][last] when the column count is odd.
+ */
+function gridStroke(grid: Pt3[][]): Pt3[] {
+  const R = grid.length;
+  const C = grid[0].length;
+  const body: Pt3[] = [];
+  for (let r = 0; r < R; r++) {
+    const cols = r % 2 === 0 ? [...Array(C).keys()] : [...Array(C).keys()].reverse();
+    for (const col of cols) body.push(grid[r][col]);
+  }
+  // the rows ended at row R-1, column 0 (R even) or C-1 (R odd); the columns start there
+  let col = R % 2 === 0 ? 0 : C - 1;
+  const step = col === 0 ? 1 : -1;
+  for (let k = 0; k < C; k++) {
+    const goingDown = k % 2 === 0;
+    const rows = goingDown ? [...Array(R).keys()].reverse() : [...Array(R).keys()];
+    for (const r of rows.slice(1)) body.push(grid[r][col]);
+    if (k < C - 1) {
+      col += step;
+      body.push(grid[goingDown ? 0 : R - 1][col]);
+    }
+  }
+  return body;
+}
+
+/**
+ * Websites & Marketing: the browser window as a slab with a wire mountain
+ * landscape receding into the screen. The stroke draws the front frame with
+ * an edge to the back at every point, the title bar, the terrain mesh, the
+ * back frame, and leaves through the base's centre.
+ */
+const browser: Pt3[] = (() => {
+  const l = 0.06;
+  const r = 0.94;
+  const top = 0.18;
+  const rad = 0.09;
+  const bar = 0.36;
+  const d = 0.11;
+  const bottom = 1;
+  // the frame's outline, densely sampled, clockwise from the bottom-left corner
+  const outline: [number, number][] = [];
+  const line = (x0: number, y0: number, x1: number, y1: number, n: number) => {
+    for (let i = 0; i < n; i++) outline.push([x0 + ((x1 - x0) * i) / n, y0 + ((y1 - y0) * i) / n]);
+  };
+  const corner = (cx: number, cy: number, from: number, to: number) => {
+    for (let i = 0; i < 6; i++) {
+      const a = (from + ((to - from) * i) / 6) * DEG;
+      outline.push([cx + rad * Math.cos(a), cy + rad * Math.sin(a)]);
+    }
+  };
+  line(l, bottom, l, top + rad, 8);
+  corner(l + rad, top + rad, 180, 270);
+  line(l + rad, top, r - rad, top, 10);
+  corner(r - rad, top + rad, 270, 360);
+  line(r, top + rad, r, bottom, 8);
+  line(r, bottom, l, bottom, 10);
+  const body: Pt3[] = [[0.5, bottom, 0]];
+  for (const [x, y] of outline) body.push([x, y, d], [x, y, -d], [x, y, d]);
+  body.push([l, bottom, d]);
+  // the title bar, up the left edge and across
+  body.push([l, bar, d], [r, bar, d], [r, bottom, d]);
+  // the terrain: rows recede into the screen, ridges rise from the screen's floor
+  const tl = l + 0.08;
+  const tr = r - 0.08;
+  const cols = 9;
+  const rows = 5;
+  const near = [0.1, 0.3, 0.55, 0.95, 0.6, 0.4, 0.7, 0.35, 0.12];
+  const far = [0.3, 0.6, 0.85, 0.5, 0.75, 1, 0.55, 0.65, 0.4];
+  const grid: Pt3[][] = [];
+  for (let rr = 0; rr < rows; rr++) {
+    const t = rr / (rows - 1);
+    const row: Pt3[] = [];
+    for (let cc = 0; cc < cols; cc++) {
+      const x = tr - ((tr - tl) * cc) / (cols - 1); // from the right, so the mesh starts where the bar ended
+      const h = near[cc] * (1 - t) + far[cc] * t;
+      row.push([x, bottom - 0.04 - h * (0.22 + 0.18 * t), d - 0.02 - t * 0.42]);
+    }
+    grid.push(row);
+  }
+  body.push(...gridStroke(grid));
+  // the mesh ends at its front-left; along the bottom to the corner, the back frame, and out through the centre
+  body.push([l, bottom, d], [l, bottom, -d]);
+  for (const [x, y] of outline.slice(1)) body.push([x, y, -d]);
+  body.push([l, bottom, -d], [l, bottom, d], [0.5, bottom, 0]);
+  return body;
 })();
 
 /**
- * Automationen: a gear. Its bottom tooth stands on the baseline; the thread
- * runs along that tooth's tip, up its flank and once round the wheel, tooth
- * by tooth, and comes down the other flank back onto the line.
+ * Backoffice: the sheet as a wire grid with its corner folded up toward the
+ * viewer, and the tick floating just above the page. The stroke runs the
+ * grid, climbs the middle column to the tick, draws it, and drops back to
+ * the base's centre.
  */
-const loops: Pt[] = (() => {
-  const cx = 0.5;
-  const outer = 0.4;
-  const root = 0.3;
-  const cy = 1 - outer;
-  const teeth = 8;
-  const pitch = 360 / teeth;
-  const tip = pitch * 0.34; // angular width of a tooth's tip
-  const rootGap = pitch * 0.34; // angular width of the gap between two teeth at the root
-  const flank = (pitch - tip - rootGap) / 2;
-  const at = (deg: number, r: number): Pt => [cx + r * Math.cos((deg * Math.PI) / 180), cy + r * Math.sin((deg * Math.PI) / 180)];
-  const pts: Pt[] = [[0, 1]];
-  // the bottom tooth is centred on 90° (straight down); go round with the angle decreasing
-  const start = 90 + tip / 2;
-  pts.push(at(start, outer));
-  for (let k = 0; k < teeth; k++) {
-    const a = start - k * pitch;
-    pts.push(at(a - tip, outer)); // across the tip
-    pts.push(at(a - tip - flank, root)); // down the flank
-    pts.push(at(a - tip - flank - rootGap, root)); // along the root
-    pts.push(at(a - pitch, outer)); // up the next flank
-  }
-  pts.push([1, 1]);
-  return pts;
-})();
-/**
- * Backoffice: a sheet with a folded corner, ticked off. Up the left edge,
- * across the top into the fold, down the right edge as far as the tick, the
- * tick out and back on itself, then down and out.
- */
-const sheet: Pt[] = (() => {
+const sheet: Pt3[] = (() => {
   const l = 0.2;
   const r = 0.8;
-  const top = 0.05;
-  const f = 0.14;
+  const top = 0.04;
+  const f = 0.16;
+  const cols = 9;
+  const rows = 10;
+  const grid: Pt3[][] = [];
+  for (let rr = 0; rr < rows; rr++) {
+    const row: Pt3[] = [];
+    for (let cc = 0; cc < cols; cc++) {
+      const x = l + ((r - l) * cc) / (cols - 1);
+      const y = 1 - ((1 - top) * rr) / (rows - 1);
+      // beyond the fold's diagonal the corner is folded over: mirrored across it and lifted
+      const over = x - (r - f) - (y - top);
+      if (over > 0) row.push([r - f + (y - top), top + (x - (r - f)), 0.06 + over * 0.5]);
+      else row.push([x, y, 0]);
+    }
+    grid.push(row);
+  }
+  const mid = grid[0][Math.floor(cols / 2)][0];
+  const z = 0.08;
   return [
-    [0, 1],
-    [l, 1],
-    [l, top],
-    [r - f, top],
-    [r - f, top + f],
-    [r, top + f],
-    [r - f, top], // the fold's diagonal
-    [r, top + f],
-    [r, 0.42],
-    [0.5, 0.74], // the tick, long stroke
-    [0.38, 0.62], // short stroke
-    [0.5, 0.74],
-    [r, 0.42],
-    [r, 1],
-    [l, 1],
-    [1, 1],
+    [0.5, 1, 0],
+    ...gridStroke(grid), // ends at the bottom-right corner
+    [mid, 1, 0],
+    [mid, 0.76, 0],
+    [mid, 0.76, z],
+    [0.36, 0.62, z], // the tick's short stroke
+    [mid, 0.76, z],
+    [0.74, 0.42, z], // and the long one
+    [mid, 0.76, z],
+    [mid, 0.76, 0],
+    [mid, 1, 0],
+    [0.5, 1, 0],
   ];
+})();
+/**
+ * Automationen: a gear with thickness and a hub. The stroke runs round the
+ * front outline and at every corner dips to the back face and returns, then
+ * steps back once and runs round the back outline, so the wheel has edges
+ * on all its teeth; the hub is a short tube through the middle.
+ */
+const gear: Pt3[] = (() => {
+  const cx = 0.5;
+  const outer = 0.4;
+  const root = 0.31;
+  const hub = 0.11;
+  const cy = 1 - outer;
+  const teeth = 9;
+  const pitch = 360 / teeth;
+  const tip = pitch * 0.36;
+  const gap = pitch * 0.36;
+  const flank = (pitch - tip - gap) / 2;
+  const h = 0.09;
+  const at = (deg: number, r: number, z: number): Pt3 => [cx + r * Math.cos(deg * DEG), cy + r * Math.sin(deg * DEG), z];
+  // the outline as a closed loop starting at the bottom tooth's left corner
+  const start = 90 + tip / 2;
+  const loop: [number, number][] = [[start, outer]];
+  for (let k = 0; k < teeth; k++) {
+    const a = start - k * pitch;
+    loop.push([a - tip, outer], [a - tip - flank, root], [a - tip - flank - gap, root], [a - pitch, outer]);
+  }
+  const body: Pt3[] = [[0.5, 1, 0]];
+  // front outline with an edge to the back at every corner
+  for (const [deg, r] of loop) body.push(at(deg, r, h), at(deg, r, -h), at(deg, r, h));
+  // the hub: from the bottom tooth's corner in to the front hub circle, round it, through to the back circle, round it, and back out
+  const hubIn = 90 + tip / 2;
+  body.push(at(hubIn, hub, h));
+  for (let i = 1; i <= 20; i++) body.push(at(hubIn + (360 * i) / 20, hub, h));
+  body.push(at(hubIn, hub, -h));
+  for (let i = 1; i <= 20; i++) body.push(at(hubIn + (360 * i) / 20, hub, -h));
+  body.push(at(hubIn, hub, h), at(start, outer, h));
+  // the back outline: step back at the start corner, round, and forward again
+  body.push(at(start, outer, -h));
+  for (const [deg, r] of loop.slice(1)) body.push(at(deg, r, -h));
+  body.push(at(start, outer, h), [0.5, 1, 0]);
+  return body;
 })();
 
 /**
- * Beratung & Schulung: a light bulb. Up the screw base with its two threads,
- * the glass flaring out into the bulb, round the top and down the other side,
- * the filament between the neck's shoulders, then down the base and out.
+ * Beratung & Schulung: a light bulb as one lathe from the screw base up:
+ * the base's threads, the flare of the neck and the glass closing to a pole.
  */
-const bubble: Pt[] = (() => {
-  const bl = 0.38;
-  const br = 0.62;
-  const cx = 0.5;
-  const cy = 0.36;
-  const rad = 0.3;
-  const a0 = 125;
-  const a1 = 415;
-  const p0: Pt = [cx + rad * Math.cos((a0 * Math.PI) / 180), cy + rad * Math.sin((a0 * Math.PI) / 180)];
-  const filament: Pt[] = [
-    [br, 0.8],
-    [0.56, 0.6],
-    [cx, 0.68],
-    [0.44, 0.6],
-    [bl, 0.8],
-  ];
-  return [
-    [0, 1],
-    [bl, 1],
-    [bl, 0.93],
-    [br, 0.93], // thread
-    [bl, 0.93],
-    [bl, 0.87],
-    [br, 0.87], // thread
-    [bl, 0.87],
-    [bl, 0.8],
-    p0,
-    ...arc(cx, cy, rad, a0, a1, 48).slice(1),
-    [br, 0.8],
-    ...filament.slice(1),
-    ...filament.slice(0, -1).reverse(),
-    [br, 1],
-    [bl, 1],
-    [1, 1],
-  ];
-})();
-export const ICONS: Record<IconName, Pt[]> = { browser, loops, sheet, bubble };
+const bulb: Pt3[] = lathe(
+  [
+    [1, 0.12],
+    [0.95, 0.12],
+    [0.9, 0.12],
+    [0.85, 0.12],
+    [0.8, 0.13],
+    [0.74, 0.17],
+    [0.66, 0.24],
+    [0.56, 0.29],
+    [0.46, 0.31],
+    [0.36, 0.3],
+    [0.26, 0.26],
+    [0.17, 0.19],
+    [0.1, 0.1],
+    [0.06, 0],
+  ],
+  8,
+  20,
+);
+/** the four sculptures: the stroke's body between the entry (0,1) and the exit (1,1) on the baseline */
+export const ICONS_3D: Record<IconName, Pt3[]> = { browser, loops: gear, sheet, bubble: bulb };
+
+/** the resting turn (radians, about the vertical axis) and the pitch (about the baseline) that give the sculptures depth even when still */
+export const REST_TURN = -0.4;
+export const PITCH = 0.38;
+/** perspective: points nearer the viewer grow by this much per unit of depth */
+const PERSPECTIVE = 0.3;
+
+/**
+ * Projects a sculpture onto the stage's plane as one polyline entering at
+ * (0,1) and leaving at (1,1). It turns by `turn` about the vertical axis
+ * through the box's centre, pitches by PITCH about the baseline, and gets a
+ * little perspective; the base's centre point stays put, so the thread always
+ * enters and leaves where the segment expects it.
+ */
+export function projectIcon(name: IconName, turn: number): Pt[] {
+  const ct = Math.cos(turn);
+  const st = Math.sin(turn);
+  const cp = Math.cos(PITCH);
+  const sp = Math.sin(PITCH);
+  const out: Pt[] = [[0, 1]];
+  for (const [x, y, z] of ICONS_3D[name]) {
+    // turn about the vertical axis through (0.5, *, 0)
+    const dx = x - 0.5;
+    const x1 = dx * ct + z * st;
+    const z1 = -dx * st + z * ct;
+    // pitch about the baseline (y = 1): the top tips away, hoops open up
+    const dy = y - 1;
+    const y2 = 1 + dy * cp + z1 * sp;
+    const z2 = -dy * sp + z1 * cp;
+    const f = 1 / (1 - z2 * PERSPECTIVE);
+    out.push([0.5 + x1 * f, 1 + (y2 - 1) * f]);
+  }
+  out.push([1, 1]);
+  return out;
+}
+/** the sculptures at rest, as flat polylines (stills, the hover, and any code that wants a fixed shape) */
+export const ICONS: Record<IconName, Pt[]> = {
+  browser: projectIcon("browser", REST_TURN),
+  loops: projectIcon("loops", REST_TURN),
+  sheet: projectIcon("sheet", REST_TURN),
+  bubble: projectIcon("bubble", REST_TURN),
+};
 
 /** the icon each service (by slug and section id) is drawn with */
 export const ICON_FOR_SERVICE: Record<string, IconName> = {
@@ -214,7 +361,7 @@ export interface Partition {
 }
 
 /** the stage's partition: most points go to the icon, the short baseline stubs need few */
-export const STAGE_PARTITION: Partition = { left: 20, icon: N - 40, right: 20 };
+export const STAGE_PARTITION: Partition = { left: 30, icon: N - 60, right: 30 };
 
 /**
  * Builds the state "a straight line from xMin to xMax with this icon standing

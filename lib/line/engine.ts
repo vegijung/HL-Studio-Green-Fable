@@ -37,7 +37,7 @@ import {
   type Rect,
 } from "./states";
 import { coverTransform } from "@/lib/ridge";
-import { ICONS, ICON_FOR_SERVICE, iconState, segmentState, type IconName } from "./icons";
+import { ICONS, ICON_FOR_SERVICE, REST_TURN, iconState, projectIcon, segmentState, type IconBox, type IconName } from "./icons";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -62,8 +62,8 @@ const TONE_BAND_VH = 0.12;
 const SPEED_UNIT_VH_S = 1.2;
 const SPEED_SHARPEN_MAX = 2;
 /** stage: a chapter boundary morphs the icon while it passes from this to that viewport fraction */
-const STAGE_MORPH_FROM = 0.82;
-const STAGE_MORPH_TO = 0.34;
+const STAGE_MORPH_FROM = 0.7;
+const STAGE_MORPH_TO = 0.25;
 /** the part of an icon-to-icon morph spent settling into the segment before the next icon rises */
 const STAGE_SETTLE = 0.4;
 /** stage icon size in px */
@@ -93,6 +93,11 @@ const STAGE_PROGRAMME: Array<{ section: string; step: StageStepKind; offsetVh?: 
 ];
 /** how fast the hover pulls the thread into an icon and lets it go (fraction of the remaining way per frame) */
 const HOVER_RATE = 0.3;
+/** the sculptures turn with the scroll (radians per viewport of scrolling) and spin while hovered on the overview (radians per second) */
+const TURN_PER_VH = 1.5;
+/** the hover on the overview may take the thread while nothing is on the stage or the first sculpture has barely begun to form */
+const HOVER_UNTIL_P = 0.6;
+const SPIN_RATE = 0.9;
 
 const IVORY = [247, 245, 239];
 const FOREST = [46, 75, 63];
@@ -154,6 +159,8 @@ interface StageStep {
   /** scroll position that drives this step: the morph into it runs while it passes from STAGE_MORPH_FROM to STAGE_MORPH_TO */
   docTop: number;
   kind: "icon" | "photo" | "segment";
+  /** the sculpture this step forms; its shape is computed per frame at the current turn */
+  icon?: IconName;
   /** the shape the thread takes (for the photograph: its ridge at the start of the pan) */
   shape: LineState;
   /** the photograph's ridge at the end of the pan, and the pan itself */
@@ -197,11 +204,18 @@ export class LineEngine {
   private stageSteps: StageStep[] = [];
   private stageEnd = 0;
   /** the hover on the services overview: the icon shapes, which one is wanted, which one is shown, and how far it has formed */
-  private stageIconShapes: Partial<Record<IconName, LineState>> = {};
   private hoverTarget: IconName | null = null;
   private hoverIcon: IconName | null = null;
   private hoverMix = 0;
   private hoverCleanup: Array<() => void> = [];
+  /** the hovered sculpture's spin (radians) and the last frame time that drove it */
+  private hoverTurn = 0;
+  private hoverTmp = emptyState();
+  private lastFrameAt = 0;
+  /** the stage's icon box and extent, kept for computing sculpture shapes per frame */
+  private stageBox: { icon: IconBox; x0: number; x1: number } | null = null;
+  /** the last shape computed per sculpture, reused while its turn does not change */
+  private iconCache: Partial<Record<IconName, { turn: number; shape: LineState }>> = {};
   /** the stage's photo window: the fixed frame, the image box inside it and its rect */
   private stagePhotoEl: HTMLElement | null = null;
   private stagePhotoImg: HTMLElement | null = null;
@@ -510,10 +524,8 @@ export class LineEngine {
         h: ICON_SIZE / this.vh,
       };
       this.stageSegment = segmentState(iconBox, this.vw, this.vh, x0, x1);
-      this.stageIconShapes = {};
-      for (const name of Object.keys(ICONS) as IconName[]) {
-        this.stageIconShapes[name] = iconState(ICONS[name], iconBox, this.vw, this.vh, x0, x1);
-      }
+      this.stageBox = { icon: iconBox, x0, x1 };
+      this.iconCache = {};
       if (this.stagePhotoEl) {
         // updateWindow() writes the frame's geometry inline; put the markup's resting geometry back before measuring
         for (const [prop, value] of Object.entries(this.stagePhotoBase)) this.stagePhotoEl.style.setProperty(prop, value);
@@ -530,7 +542,7 @@ export class LineEngine {
           return { docTop, kind: "segment", shape: seg, shapeEnd: seg, pan, opacity: STAGE_OPACITY_QUIET };
         }
         const shape = iconState(ICONS[kind], iconBox, this.vw, this.vh, x0, x1);
-        return { docTop, kind: "icon", shape, shapeEnd: shape, pan, opacity: 1 };
+        return { docTop, kind: "icon", icon: kind, shape, shapeEnd: shape, pan, opacity: 1 };
       };
       this.stageSteps = STAGE_PROGRAMME.flatMap((step) => {
         const top = sectionTop(step.section);
@@ -602,9 +614,33 @@ export class LineEngine {
     return { k, p };
   }
 
+  /** a sculpture on the stage at a given turn, as the thread's shape; recomputed only when the turn changes */
+  private iconShapeAt(name: IconName, turn: number): LineState {
+    const box = this.stageBox;
+    if (!box) return this.stageSegment;
+    const q = Math.round(turn * 400) / 400;
+    const cached = this.iconCache[name];
+    if (cached && cached.turn === q) return cached.shape;
+    const shape = iconState(projectIcon(name, q), box.icon, this.vw, this.vh, box.x0, box.x1);
+    this.iconCache[name] = { turn: q, shape };
+    return shape;
+  }
+
+  /** how far a step's sculpture has turned at scroll s: it rests slightly turned and keeps turning as the chapter scrolls by */
+  private turnFor(step: StageStep, s: number): number {
+    return REST_TURN + (TURN_PER_VH * (s - step.docTop)) / this.vh;
+  }
+
+  /** the shape a step shows at scroll s once formed (a sculpture at its current turn, a photo ridge, or the segment) */
+  private stepShapeAt(step: StageStep, s: number): LineState {
+    return step.kind === "icon" && step.icon ? this.iconShapeAt(step.icon, this.turnFor(step, s)) : step.shape;
+  }
+
   /** the shape a step leaves behind when the next one begins */
-  private stepShapeEnd(k: number): LineState {
-    return k < 0 ? this.stageSegment : this.stageSteps[k].shapeEnd;
+  private stepShapeEnd(k: number, s: number): LineState {
+    if (k < 0) return this.stageSegment;
+    const step = this.stageSteps[k];
+    return step.kind === "icon" ? this.stepShapeAt(step, s) : step.shapeEnd;
   }
 
   /** where the crop in the stage window looks at scroll s: it pans across the photograph while the photograph holds */
@@ -631,6 +667,7 @@ export class LineEngine {
     if (this.hoverIcon !== this.hoverTarget && this.hoverMix <= 0.001) {
       this.hoverIcon = this.hoverTarget;
       this.hoverMix = 0;
+      this.hoverTurn = 0;
     }
     const target = this.hoverTarget && this.hoverTarget === this.hoverIcon ? 1 : 0;
     const d = target - this.hoverMix;
@@ -642,23 +679,42 @@ export class LineEngine {
     return true;
   }
 
-  /** the stage's shape at scroll s: segment or icon, the morph between two steps, or the panning photo ridge */
-  private stageShape(s: number, out: LineState): LineState {
+  /** whether the overview hover may take the thread at scroll s */
+  private hoverAllowed(s: number): boolean {
     const { k, p } = this.stageAt(s);
-    if (k < 0) {
-      // while the thread waits on the stage, a hovered service name pulls it into that icon
-      const hovered = this.hoverIcon && this.stageIconShapes[this.hoverIcon];
-      if (hovered && this.hoverMix > 0) return morphInto(out, this.stageSegment, hovered, easeInOutQuad(this.hoverMix), "thread");
-      return copyState(this.stageSegment, out);
+    return k < 0 || (k === 0 && p < HOVER_UNTIL_P);
+  }
+
+  /**
+   * The stage's shape at scroll s: the programme's shape, and on the overview
+   * a hovered service name pulls the thread into that sculpture, which slowly
+   * spins. The hover blends over whatever the programme shows, so leaving it
+   * never jumps.
+   */
+  private stageShape(s: number, out: LineState): LineState {
+    const base = this.stageShapeBase(s, out);
+    if (this.hoverIcon && this.hoverMix > 0 && this.hoverAllowed(s)) {
+      const hovered = this.iconShapeAt(this.hoverIcon, REST_TURN + this.hoverTurn);
+      copyState(base, this.hoverTmp);
+      return morphInto(out, this.hoverTmp, hovered, easeInOutQuad(this.hoverMix), "thread");
     }
+    return base;
+  }
+
+  /** the programme's shape at scroll s: segment or sculpture, the morph between two steps, or the panning photo ridge */
+  private stageShapeBase(s: number, out: LineState): LineState {
+    const { k, p } = this.stageAt(s);
+    if (k < 0) return copyState(this.stageSegment, out);
     const step = this.stageSteps[k];
-    const from = this.stepShapeEnd(k - 1);
+    const from = this.stepShapeEnd(k - 1, s);
     if (step.kind === "photo" && p >= 1) return this.stagePhotoState(this.stageFocus(s), out);
+    if (step.kind === "icon" && p >= 1) return copyState(this.stepShapeAt(step, s), out);
+    const to = this.stepShapeAt(step, s);
     // the photograph and the segment morph into each other directly; anything else goes through the segment
     if (step.kind === "segment" || (step.kind === "photo" && from === this.stageSegment)) {
-      return morphInto(out, from, step.shape, p, "thread");
+      return morphInto(out, from, to, p, "thread");
     }
-    return this.morphViaSegment(out, from, step.shape, p);
+    return this.morphViaSegment(out, from, to, p);
   }
 
   /**
@@ -697,7 +753,8 @@ export class LineEngine {
    */
   private stageOpacity(s: number): number {
     const { k, p } = this.stageAt(s);
-    if (k < 0) return lerp(STAGE_OPACITY_BEFORE, 1, this.hoverMix);
+    const hover = this.hoverAllowed(s) ? this.hoverMix : 0;
+    if (k < 0) return lerp(STAGE_OPACITY_BEFORE, 1, hover);
     const step = this.stageSteps[k];
     if (step.kind === "photo" && p >= 1) {
       const holdStart = step.docTop - STAGE_MORPH_TO * this.vh;
@@ -708,7 +765,7 @@ export class LineEngine {
       return 1 - easeInOutQuad(gone);
     }
     const from = k === 0 ? STAGE_OPACITY_BEFORE : this.stageSteps[k - 1].opacity;
-    return lerp(from, step.opacity, p);
+    return Math.max(lerp(from, step.opacity, p), hover);
   }
 
   private shapeOf(n: Node, s: number, out: LineState): LineState {
@@ -818,8 +875,14 @@ export class LineEngine {
       }
     }
 
-    // render() clears `dirty` itself once the colour has converged; a moving hover renders too
-    const hovering = this.updateHover();
+    // the hovered sculpture spins with time
+    const now = performance.now();
+    const dt = this.lastFrameAt ? Math.min(0.05, (now - this.lastFrameAt) / 1000) : 0;
+    this.lastFrameAt = now;
+    if (this.hoverMix > 0) this.hoverTurn += SPIN_RATE * dt;
+
+    // render() clears `dirty` itself once the colour has converged; a moving or spinning hover renders too
+    const hovering = this.updateHover() || this.hoverMix > 0;
     if (this.rendered !== this.lastRendered || this.dirty || hovering) {
       this.render(this.rendered);
       this.lastRendered = this.rendered;
