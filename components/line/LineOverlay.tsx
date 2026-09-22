@@ -54,6 +54,7 @@ export function LineOverlay() {
       ref={svgRef}
       aria-hidden
       data-line-overlay
+      preserveAspectRatio="none"
       className="pointer-events-none fixed inset-0 z-10 h-full w-full"
     >
       <defs>

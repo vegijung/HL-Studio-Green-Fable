@@ -27,7 +27,7 @@ function Portrait({ member, sizes, priority = false }: { member: Member; sizes: 
   );
 }
 
-/** Section 12: two portraits of the same size, offset baselines. Greyscale on ivory, no frames. */
+/** Section 12: two portraits of the same size at the same height. Greyscale on ivory, no frames. */
 export function Team({ content }: { content: SiteContent["team"] }) {
   const [first, second] = content.members;
   return (
@@ -38,7 +38,7 @@ export function Team({ content }: { content: SiteContent["team"] }) {
         <div className="col-span-8 lg:col-span-5">
           <Portrait member={first} sizes="(min-width: 1024px) 24vw, 66vw" />
         </div>
-        <div className="col-span-8 col-start-5 mt-16 lg:col-span-5 lg:col-start-8 lg:mt-40">
+        <div className="col-span-8 col-start-5 mt-16 lg:col-span-5 lg:col-start-8 lg:mt-0">
           <Portrait member={second} sizes="(min-width: 1024px) 24vw, 66vw" />
         </div>
       </Grid>

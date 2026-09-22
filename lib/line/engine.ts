@@ -67,6 +67,8 @@ const ICON_SIZE = 200;
 const STAGE_OPACITY = [0.6, 1, 1];
 /** the stage window grows into the full photograph over this much scrolling (in vh) */
 const GROW_VH = 0.55;
+/** the crop in the stage window pans across the photograph (object-position x from, to) from the moment it is fully there until the growth starts */
+const PHOTO_PAN: [number, number] = [0.05, 0.9];
 /** the stage's icons in chapter order, and the section ids whose top starts the morph into each one; `null` brings the photograph back */
 const STAGE_PROGRAMME: Array<{ section: string; icon: IconName | null }> = [
   { section: "websites", icon: "browser" },
@@ -174,7 +176,9 @@ export class LineEngine {
   private stagePhotoEl: HTMLElement | null = null;
   private stagePhotoImg: HTMLElement | null = null;
   private stageWindow: Rect = { left: 0, top: 0, width: 1, height: 1 };
-  private photoFocus = 0.5;
+  private photoPan: [number, number] = PHOTO_PAN;
+  /** scroll px at which the photograph is fully in the window and the pan begins */
+  private panStart = 0;
   /** how far the photograph is present under the line this frame (0..1); drives the window and the colour */
   private photoAlpha = 0;
   /** the window this frame: null while hidden, "handover" once the photo in the flow has taken over */
@@ -343,7 +347,8 @@ export class LineEngine {
 
     this.stagePhotoEl = document.querySelector<HTMLElement>("[data-line-stage-photo]");
     this.stagePhotoImg = this.stagePhotoEl?.firstElementChild as HTMLElement | null;
-    this.photoFocus = this.stagePhotoEl?.dataset.lineStagePhotoFocus ? Number(this.stagePhotoEl.dataset.lineStagePhotoFocus) : 0.5;
+    const pan = this.stagePhotoEl?.dataset.lineStagePhotoPan?.split(/\s+/).map(Number);
+    if (pan && pan.length === 2 && pan.every((v) => Number.isFinite(v))) this.photoPan = [pan[0], pan[1]];
     const photoEl = document.querySelector<HTMLElement>("[data-line-photo]");
     if (photoEl) {
       this.nodes.push(
@@ -367,8 +372,9 @@ export class LineEngine {
 
   /** re-measures everything that depends on layout; runs on every ScrollTrigger refresh */
   private measure() {
-    this.vw = window.innerWidth;
-    this.vh = window.innerHeight;
+    // the layout viewport without the scrollbar: the fixed SVG is exactly this big, so the drawing is 1:1
+    this.vw = document.documentElement.clientWidth || window.innerWidth;
+    this.vh = document.documentElement.clientHeight || window.innerHeight;
     this.svg.setAttribute("viewBox", `0 0 ${this.vw} ${this.vh}`);
     this.maskBg.setAttribute("width", String(this.vw));
     this.maskBg.setAttribute("height", String(this.vh));
@@ -446,13 +452,12 @@ export class LineEngine {
         h: ICON_SIZE / this.vh,
       };
       this.stageSegment = segmentState(iconBox, this.vw, this.vh, x0, x1);
-      // the photo window: the ridge of the crop it shows, relative to the stage baseline
+      // the photo window: the ridge of the crop it shows when it has just appeared, relative to the stage baseline
       let photoShape = copyState(this.stageSegment);
       if (this.stagePhotoEl) {
         const w = this.stagePhotoEl.getBoundingClientRect();
         this.stageWindow = { left: w.left, top: w.top, width: w.width, height: w.height };
-        const r = ridgeInRect(this.ridge, this.stageWindow, this.photoFocus, this.vw, this.vh);
-        photoShape = rebase(r.state, r.baselineY / this.vh, stage.fixedY);
+        photoShape = this.stagePhotoState(this.photoPan[0]);
       }
       this.stageSteps = STAGE_PROGRAMME.flatMap((step) => {
         const docTop = sectionTop(step.section);
@@ -467,6 +472,8 @@ export class LineEngine {
       const after = this.nodes[stageIndex + 1];
       stage.end = after ? after.start - (after.kind === "photo" ? GROW_VH : 0.6) * this.vh : Number.MAX_SAFE_INTEGER;
       if (stage.end < stage.start) stage.end = stage.start;
+      const last = this.stageSteps[this.stageSteps.length - 1];
+      this.panStart = last ? last.docTop - STAGE_MORPH_TO * this.vh : stage.end;
     }
 
     // consecutive windows must not overlap; leave room for the blend between them
@@ -500,7 +507,22 @@ export class LineEngine {
     el.style.setProperty("--ridge-clear", `${Math.round(clear)}px`);
   }
 
-  /** the stage's shape at scroll s: segment or icon, or the morph between two steps */
+  /** the ridge of the crop the stage window shows at `focus` (object-position x), relative to the stage baseline */
+  private stagePhotoState(focus: number, out?: LineState): LineState {
+    const stage = this.nodes.find((n) => n.kind === "stage");
+    const r = ridgeInRect(this.ridge, this.stageWindow, focus, this.vw, this.vh);
+    const state = rebase(r.state, r.baselineY / this.vh, stage ? stage.fixedY : r.baselineY / this.vh);
+    return out ? copyState(state, out) : state;
+  }
+
+  /** where the crop in the stage window looks at scroll s: it pans across the photograph from the pan start to the growth */
+  private stageFocus(s: number): number {
+    const stage = this.nodes.find((n) => n.kind === "stage");
+    const end = stage ? stage.end : this.panStart;
+    return lerp(this.photoPan[0], this.photoPan[1], clamp((s - this.panStart) / Math.max(1, end - this.panStart)));
+  }
+
+  /** the stage's shape at scroll s: segment or icon, the morph between two steps, or the panning photo ridge */
   private stageShape(s: number, out: LineState): LineState {
     const steps = this.stageSteps;
     let k = -1;
@@ -512,6 +534,7 @@ export class LineEngine {
       p = prog;
     }
     if (k < 0) return copyState(this.stageSegment, out);
+    if (k === steps.length - 1 && STAGE_PROGRAMME[k]?.icon === null && p >= 1) return this.stagePhotoState(this.stageFocus(s), out);
     const from = k === 0 ? this.stageSegment : steps[k - 1].shape;
     return this.morphViaSegment(out, from, steps[k].shape, p);
   }
@@ -572,7 +595,7 @@ export class LineEngine {
       width: lerp(w0.width, this.vw, e),
       height: lerp(w0.height, real.height, e),
     };
-    const focus = lerp(this.photoFocus, 0.5, e);
+    const focus = lerp(this.photoPan[1], 0.5, e);
     const r = ridgeInRect(this.ridge, rect, focus, this.vw, this.vh);
     copyState(r.state, this.work);
     this.photoAlpha = 1;
@@ -599,7 +622,7 @@ export class LineEngine {
       this.shapeOf(n, s, this.work);
       if (n.kind === "stage") {
         this.photoAlpha = this.stagePhotoAlpha(s);
-        if (this.photoAlpha > 0) this.windowFrame = { rect: this.stageWindow, focus: this.photoFocus, alpha: this.photoAlpha };
+        if (this.photoAlpha > 0) this.windowFrame = { rect: this.stageWindow, focus: this.stageFocus(s), alpha: this.photoAlpha };
       }
       if (n.kind === "photo") {
         this.photoAlpha = 1;
