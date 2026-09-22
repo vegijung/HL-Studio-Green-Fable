@@ -68,18 +68,16 @@ const STAGE_OPACITY_BEFORE = 0.6;
 const STAGE_OPACITY_QUIET = 0.5;
 /** the stage window grows into the full photograph over this much scrolling (in vh) */
 const GROW_VH = 0.55;
-/** the crop in the stage window (object-position x from, to) while the photograph is there: on its first appearance and on its return */
-const PHOTO_PAN_FIRST: [number, number] = [0.05, 0.35];
-const PHOTO_PAN_RETURN: [number, number] = [0.6, 0.8];
-/** the return: the photograph is back this long (in vh) before the growth starts */
-const RETURN_HOLD_VH = 0.05;
+/** the crop in the stage window (object-position x from, to): it pans across the photograph from its arrival to the growth */
+const PHOTO_PAN: [number, number] = [0.05, 0.9];
+/** on the photograph the line shows only as it arrives and again before the growth; it fades over this much scrolling (in vh) */
+const PHOTO_LINE_FADE_VH = 0.3;
 type StageStepKind = IconName | "photo" | "segment";
 /**
  * The stage's programme: which shape the thread takes as which section's top
  * passes (optionally offset by a fraction of the viewport). After the last
- * icon the photograph comes back with its ridge, then the thread settles into
- * the quiet segment; the photograph's return before the closing is added by
- * the engine relative to the growth.
+ * icon the photograph comes back with its ridge and stays until the window
+ * grows into the closing.
  */
 const STAGE_PROGRAMME: Array<{ section: string; step: StageStepKind; offsetVh?: number }> = [
   { section: "websites", step: "browser" },
@@ -87,7 +85,6 @@ const STAGE_PROGRAMME: Array<{ section: string; step: StageStepKind; offsetVh?: 
   { section: "backoffice", step: "sheet" },
   { section: "beratung-schulung", step: "bubble" },
   { section: "cases", step: "photo" },
-  { section: "cases", step: "segment", offsetVh: 1 },
 ];
 
 const IVORY = [247, 245, 239];
@@ -486,7 +483,7 @@ export class LineEngine {
       this.stageSteps = STAGE_PROGRAMME.flatMap((step) => {
         const top = sectionTop(step.section);
         if (top === null) return [];
-        return [makeStep(top + (step.offsetVh ?? 0) * this.vh, step.step, PHOTO_PAN_FIRST)];
+        return [makeStep(top + (step.offsetVh ?? 0) * this.vh, step.step, PHOTO_PAN)];
       });
       const stageIndex = this.nodes.indexOf(stage);
       const first = this.stageSteps[0];
@@ -496,14 +493,6 @@ export class LineEngine {
       stage.end = after ? after.start - (after.kind === "photo" ? GROW_VH : 0.6) * this.vh : Number.MAX_SAFE_INTEGER;
       if (stage.end < stage.start) stage.end = stage.start;
       this.stageEnd = stage.end;
-      // the return: the photograph is back, on its ridge, just before the window grows into the closing
-      if (after?.kind === "photo" && hasWindow) {
-        const returnTop = stage.end - RETURN_HOLD_VH * this.vh + STAGE_MORPH_TO * this.vh;
-        const prev = this.stageSteps[this.stageSteps.length - 1];
-        // the settle into the quiet segment needs room before the return; drop it if there is none
-        if (prev && prev.kind === "segment" && prev.docTop > returnTop - 0.7 * this.vh) this.stageSteps.pop();
-        this.stageSteps.push(makeStep(returnTop, "photo", PHOTO_PAN_RETURN));
-      }
     }
 
     // consecutive windows must not overlap; leave room for the blend between them
@@ -567,7 +556,7 @@ export class LineEngine {
   /** where the crop in the stage window looks at scroll s: it pans across the photograph while the photograph holds */
   private stageFocus(s: number): number {
     const { k, p } = this.stageAt(s);
-    if (k < 0) return PHOTO_PAN_FIRST[0];
+    if (k < 0) return PHOTO_PAN[0];
     const step = this.stageSteps[k];
     if (step.kind === "photo") {
       if (p < 1) return step.pan[0];
@@ -577,7 +566,7 @@ export class LineEngine {
       return lerp(step.pan[0], step.pan[1], clamp((s - holdStart) / Math.max(1, holdEnd - holdStart)));
     }
     const prev = this.stageSteps[k - 1];
-    return prev ? prev.pan[1] : PHOTO_PAN_FIRST[0];
+    return prev ? prev.pan[1] : PHOTO_PAN[0];
   }
 
   /** the stage's shape at scroll s: segment or icon, the morph between two steps, or the panning photo ridge */
@@ -623,12 +612,25 @@ export class LineEngine {
     return 0;
   }
 
-  /** the stage's opacity: quieter before the first icon and while the segment waits between the photograph's appearances */
+  /**
+   * The stage's opacity: quieter before the first icon. On the photograph the
+   * line is there as the ridge arrives, fades away while the picture pans on
+   * its own, and comes back as the ridge just before the window grows.
+   */
   private stageOpacity(s: number): number {
     const { k, p } = this.stageAt(s);
     if (k < 0) return STAGE_OPACITY_BEFORE;
+    const step = this.stageSteps[k];
+    if (step.kind === "photo" && p >= 1) {
+      const holdStart = step.docTop - STAGE_MORPH_TO * this.vh;
+      const next = this.stageSteps[k + 1];
+      const holdEnd = next ? next.docTop - STAGE_MORPH_FROM * this.vh : this.stageEnd;
+      const fade = PHOTO_LINE_FADE_VH * this.vh;
+      const gone = Math.min(clamp((s - holdStart) / fade), clamp((holdEnd - s) / fade));
+      return 1 - easeInOutQuad(gone);
+    }
     const from = k === 0 ? STAGE_OPACITY_BEFORE : this.stageSteps[k - 1].opacity;
-    return lerp(from, this.stageSteps[k].opacity, p);
+    return lerp(from, step.opacity, p);
   }
 
   private shapeOf(n: Node, s: number, out: LineState): LineState {
@@ -654,7 +656,7 @@ export class LineEngine {
       width: lerp(w0.width, this.vw, e),
       height: lerp(w0.height, real.height, e),
     };
-    const focus = lerp(PHOTO_PAN_RETURN[1], 0.5, e);
+    const focus = lerp(PHOTO_PAN[1], 0.5, e);
     const r = ridgeInRect(this.ridge, rect, focus, this.vw, this.vh);
     copyState(r.state, this.work);
     this.photoAlpha = 1;
