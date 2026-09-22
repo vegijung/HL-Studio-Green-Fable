@@ -50,8 +50,8 @@ export const de: SiteContent = {
         index: "01",
         name: "Websites & Marketing",
         headline: "Deine neue Website. In fünf Arbeitstagen.",
-        text: "Auf Deutsch und Englisch, mit Buchung oder Kontakt angebunden, in der Schweiz gehostet. Dazu Texte, Newsletter und Social Media, wenn du es willst.",
-        tags: ["Website", "Onlineshop", "SEO", "Newsletter", "Social Media"],
+        text: "Auf Deutsch und Englisch, mit Buchung oder Kontakt angebunden, in der Schweiz gehostet. Dazu Texte und Newsletter, wenn du es willst.",
+        tags: ["Website", "Onlineshop", "SEO", "Newsletter"],
         link: { label: "Ab CHF 1'000 → Preise", href: "/#preise" },
       },
       {
