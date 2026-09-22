@@ -17,9 +17,18 @@ export interface Service {
   name: string;
   headline: string;
   text: string;
+  /** a second paragraph with more depth */
+  detail: string;
+  /** three things the client gets, one line each */
+  points: string[];
   tags: string[];
   /** optional inline link under the copy, e.g. the price link of the entry offer */
   link?: Link;
+}
+
+export interface Usp {
+  title: string;
+  text: string;
 }
 
 export interface Fact {
@@ -94,6 +103,8 @@ export interface SiteContent {
     label: string;
     h2: string;
     text: string;
+    /** why HL Studio, in four short points under the intro */
+    usps: Usp[];
     items: Service[];
   };
   cases: {

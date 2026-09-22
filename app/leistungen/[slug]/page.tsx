@@ -41,7 +41,15 @@ export default async function ServicePage({ params }: { params: Params }) {
       back={{ label: content.subpages.back, href: "/#leistungen" }}
     >
       <p className="body-text-lg mt-8">{service.text}</p>
-      <Tags items={service.tags} className="mt-10" />
+      <p className="body-text mt-6 text-charcoal/80">{service.detail}</p>
+      <ul className="mt-10">
+        {service.points.map((point) => (
+          <li key={point} className="border-t border-fog py-4 text-[15px] leading-snug last:border-b">
+            {point}
+          </li>
+        ))}
+      </ul>
+      <Tags items={service.tags} className="mt-8" />
       <div className="mt-14 flex flex-wrap items-center gap-x-10 gap-y-4">
         <Cta label={content.subpages.serviceCta} variant="solid" />
         <Link

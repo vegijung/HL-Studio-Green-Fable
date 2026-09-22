@@ -44,6 +44,24 @@ export const de: SiteContent = {
     label: "Leistungen",
     h2: "Von der Website bis zur Buchhaltung.",
     text: "Vier Bereiche, ein Team. Du bekommst keine Agentur mit zwölf Ansprechpersonen, sondern zwei Leute, die alles selbst bauen.",
+    usps: [
+      {
+        title: "Fixpreis",
+        text: "Du weisst vor dem Start, was es kostet und wann es fertig ist. Keine Stundenbudgets, keine Überraschungen.",
+      },
+      {
+        title: "In Tagen, nicht Monaten",
+        text: "Eine Website in fünf Arbeitstagen, eine Automation in zwei bis drei Wochen. Wir bauen mit den Werkzeugen von heute.",
+      },
+      {
+        title: "Zwei, die selbst bauen",
+        text: "Du sprichst vom ersten Gespräch bis zum Livegang mit denselben zwei Leuten, die deine Lösung umsetzen.",
+      },
+      {
+        title: "Aus dem Oberwallis",
+        text: "Vor Ort in Brig und bei dir im Betrieb, wenn es hilft. Hosting und Daten bleiben in der Schweiz.",
+      },
+    ],
     items: [
       {
         slug: "websites",
@@ -51,6 +69,13 @@ export const de: SiteContent = {
         name: "Websites & Marketing",
         headline: "Deine neue Website. In fünf Arbeitstagen.",
         text: "Auf Deutsch und Englisch, mit Buchung oder Kontakt angebunden, in der Schweiz gehostet. Dazu Texte und Newsletter, wenn du es willst.",
+        detail:
+          "Du bringst Logo und Inhalte, wir bringen Struktur, Text und Gestaltung. Nach fünf Arbeitstagen ist die Website online, zweisprachig und auf jedem Gerät lesbar. Danach pflegen wir sie im Abo, wenn du willst.",
+        points: [
+          "Konzept, Texte und Design aus einer Hand",
+          "Buchung, Kontakt oder Shop direkt angebunden",
+          "Gefunden werden: Google-Eintrag und SEO inklusive",
+        ],
         tags: ["Website", "Onlineshop", "SEO", "Newsletter"],
         link: { label: "Ab CHF 1'000 → Preise", href: "/#preise" },
       },
@@ -60,6 +85,13 @@ export const de: SiteContent = {
         name: "Automationen",
         headline: "Die KI schlägt vor. Du entscheidest.",
         text: "Abläufe, die dich jeden Tag Zeit kosten, laufen automatisch: Anfragen beantworten, Offerten erstellen, Bewertungen bearbeiten.",
+        detail:
+          "Wir schauen uns an, was dich jeden Tag Zeit kostet, und bauen den Ablauf so, dass er ohne dich läuft. Du behältst die Kontrolle: Nichts geht raus, was du nicht freigegeben hast.",
+        points: [
+          "Läuft in deinen bestehenden Tools: Mail, WhatsApp, Buchhaltung",
+          "Die KI schlägt vor, du prüfst mit einem Klick",
+          "Umsetzung in zwei bis drei Wochen, danach Schulung deines Teams",
+        ],
         tags: ["Anfragen-Assistent", "Offerten", "Bewertungen", "Termine"],
       },
       {
@@ -68,6 +100,13 @@ export const de: SiteContent = {
         name: "Backoffice",
         headline: "Das Büro, das sich nicht stapelt.",
         text: "Belege, Mahnungen, Terminplanung, Rapporte: Wir richten die Systeme ein und übernehmen im Abo, was du nicht selbst machen willst.",
+        detail:
+          "Wir richten die Systeme ein und übernehmen laufend, was liegen bleibt. Du siehst jederzeit, was erledigt ist, und entscheidest, was du weiterhin selbst machen willst.",
+        points: [
+          "Belege und Rechnungen werden gelesen, zugeordnet und vorerfasst",
+          "Mahnwesen und Terminplanung laufen im Hintergrund",
+          "Im Abo, mit Antwort am selben Arbeitstag",
+        ],
         tags: ["Belege", "Rechnungen", "Mahnwesen", "Terminplanung", "CRM"],
       },
       {
@@ -76,6 +115,13 @@ export const de: SiteContent = {
         name: "Beratung & Schulung",
         headline: "Erst verstehen, dann automatisieren.",
         text: "Eine halbtägige KI-Schulung für dein Team. Oder ein Workshop, der klärt, welche Abläufe sich bei dir automatisieren lassen und welche nicht.",
+        detail:
+          "Kein Vortrag, sondern Arbeit an deinen eigenen Abläufen. Am Ende weisst du, welche drei Dinge du zuerst angehst, was sie kosten und was sie dir bringen.",
+        points: [
+          "Ein halber Tag, in deinem Betrieb, mit deinen Beispielen",
+          "Eine klare Antwort, was sich bei dir lohnt und was nicht",
+          "Eine Empfehlung für Werkzeuge, die zu deiner Grösse passen",
+        ],
         tags: ["KI-Schulung", "Prozess-Check", "Tool-Auswahl"],
       },
     ],

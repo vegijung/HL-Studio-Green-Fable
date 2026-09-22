@@ -87,7 +87,7 @@ const STAGE_PROGRAMME: Array<{ section: string; step: StageStepKind; offsetVh?: 
   { section: "cases", step: "photo" },
 ];
 /** how fast the hover pulls the thread into an icon and lets it go (fraction of the remaining way per frame) */
-const HOVER_RATE = 0.14;
+const HOVER_RATE = 0.3;
 
 const IVORY = [247, 245, 239];
 const FOREST = [46, 75, 63];
