@@ -59,34 +59,31 @@ const browser: Pt[] = (() => {
 })();
 
 /**
- * Automationen: the thread feeding back into itself, a cycle. It runs up the
- * right side of a circle standing on the baseline, over the top, down the left
- * side and out, with an arrowhead at two and eight o'clock in the direction of
- * travel, each drawn out and back on itself.
+ * Automationen: a gear. Its bottom tooth stands on the baseline; the thread
+ * runs along that tooth's tip, up its flank and once round the wheel, tooth
+ * by tooth, and comes down the other flank back onto the line.
  */
 const loops: Pt[] = (() => {
   const cx = 0.5;
-  const rad = 0.36;
-  const cy = 1 - rad;
-  const pts: Pt[] = [
-    [0, 1],
-    [cx, 1],
-  ];
-  const at = (deg: number): Pt => [cx + rad * Math.cos((deg * Math.PI) / 180), cy + rad * Math.sin((deg * Math.PI) / 180)];
-  const arrows = new Set([-30, -210]);
-  // from the bottom (90°) round the circle with the angle decreasing: up the right side first
-  for (let deg = 90; deg >= -270; deg -= 5) {
-    const tip = at(deg);
-    pts.push(tip);
-    if (arrows.has(deg)) {
-      const a = (deg * Math.PI) / 180;
-      const d = [Math.sin(a), -Math.cos(a)]; // direction of travel
-      const n = [Math.cos(a), Math.sin(a)]; // outward normal
-      const len = 0.12;
-      const half = 0.08;
-      const barb = (sign: number): Pt => [tip[0] - len * d[0] + sign * half * n[0], tip[1] - len * d[1] + sign * half * n[1]];
-      pts.push(barb(1), tip, barb(-1), tip);
-    }
+  const outer = 0.4;
+  const root = 0.3;
+  const cy = 1 - outer;
+  const teeth = 8;
+  const pitch = 360 / teeth;
+  const tip = pitch * 0.34; // angular width of a tooth's tip
+  const rootGap = pitch * 0.34; // angular width of the gap between two teeth at the root
+  const flank = (pitch - tip - rootGap) / 2;
+  const at = (deg: number, r: number): Pt => [cx + r * Math.cos((deg * Math.PI) / 180), cy + r * Math.sin((deg * Math.PI) / 180)];
+  const pts: Pt[] = [[0, 1]];
+  // the bottom tooth is centred on 90° (straight down); go round with the angle decreasing
+  const start = 90 + tip / 2;
+  pts.push(at(start, outer));
+  for (let k = 0; k < teeth; k++) {
+    const a = start - k * pitch;
+    pts.push(at(a - tip, outer)); // across the tip
+    pts.push(at(a - tip - flank, root)); // down the flank
+    pts.push(at(a - tip - flank - rootGap, root)); // along the root
+    pts.push(at(a - pitch, outer)); // up the next flank
   }
   pts.push([1, 1]);
   return pts;

@@ -50,7 +50,6 @@ export default function Home() {
       <div
         aria-hidden
         data-line-stage-photo
-        data-line-stage-photo-pan="0.05 0.9"
         className="pointer-events-none invisible fixed z-[5] hidden overflow-hidden opacity-0 lg:block"
         style={{
           left: "calc(50vw + 0.2 * min(1280px, 100vw - 96px))",
