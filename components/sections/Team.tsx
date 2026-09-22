@@ -34,7 +34,7 @@ export function Team({ content }: { content: SiteContent["team"] }) {
     <Section id="team" narrow>
       <SectionHead label={content.label} title={content.h2} text={content.text} />
 
-      <Grid className="mt-24 items-start lg:mt-32">
+      <Grid className="mt-16 items-start lg:mt-20">
         <div className="col-span-8 lg:col-span-5">
           <Portrait member={first} sizes="(min-width: 1024px) 24vw, 66vw" />
         </div>
@@ -43,7 +43,7 @@ export function Team({ content }: { content: SiteContent["team"] }) {
         </div>
       </Grid>
 
-      <Hairline className="mt-20 lg:mt-28" />
+      <Hairline className="mt-16 lg:mt-20" />
     </Section>
   );
 }

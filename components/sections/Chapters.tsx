@@ -23,7 +23,7 @@ function Chapter({ service, figure }: { service: Service; figure?: ReactNode }) 
         <span>{service.name}</span>
       </p>
 
-      <Grid className="mt-20 lg:mt-28">
+      <Grid className="mt-14 lg:mt-16">
         <div className="col-span-12 lg:col-span-6">
           <h2 className="display-h2" data-line-gap>
             {service.headline}

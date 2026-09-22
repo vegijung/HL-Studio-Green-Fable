@@ -30,9 +30,9 @@
   --font-sans: var(--font-inter), system-ui, sans-serif;
   --font-serif: var(--font-playfair), Georgia, serif;
 
-  /* vertical rhythm: 160px / 208px section padding */
-  --spacing-section: 10rem;
-  --spacing-section-lg: 13rem;
+  /* vertical rhythm: 112px / 144px section padding (tightened from the brief's 160 / 208 once the chapters carried more text) */
+  --spacing-section: 7rem;
+  --spacing-section-lg: 9rem;
   --spacing-nav: var(--nav-height);
 
   /* 1280px content width inside a 1440 design width */

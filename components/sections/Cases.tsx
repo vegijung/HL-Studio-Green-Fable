@@ -45,7 +45,7 @@ export function Cases({ content }: { content: SiteContent["cases"] }) {
     <Section id="cases" narrow>
       <SectionHead label={content.label} title={content.h2} text={content.text} />
 
-      <ol className="mt-24 lg:mt-32">
+      <ol className="mt-16 lg:mt-20">
         {content.items.map((item) => (
           <li key={item.title} className="border-t border-fog py-14 last:border-b lg:py-16">
             <Grid className="gap-y-8">
